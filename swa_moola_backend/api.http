@@ -1,0 +1,18 @@
+@JWTToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3NzY0MTY1OTcsIm5hbWUiOiJydWRvIiwic3ViIjoiYTA0ODliNTktZDc5MS00YWFiLWIyYWUtZjg5NDIxMzgzZmQxIn0.O8UaGG_YKHQkXwDzv0gZazDIyan4uKp74ddAYu1waAw"
+
+curl -X POST http://127.0.0.1:8000/users/register \
+     -H "Content-Type: application/json" \
+     -d '{
+    "name": "Munya",
+    "phone_number" : "+27627197691",
+    "password" : "munya456"
+    }'
+
+
+###
+curl -X POST http://127.0.0.1:8000/users/login \
+     -H "Content-Type: application/json" \
+     -d '{
+    "phone_number" : "+27627197691",
+    "password" : "munya456"
+    }'

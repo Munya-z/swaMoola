@@ -1,0 +1,44 @@
+That is a top-tier strategy for getting hired. In the current
+ tech market, a "To-Do List" or a "Weather App" won't get you
+ noticed, but a secure, peer-to-peer financial system built in
+ Rust will.
+Hiring managers at fintechs and high-end engineering 
+firms look for three specific things that this project proves:
+1. Mastery of "The Hard Stuff"
+By using Axum and Rust, you are signaling that you aren't 
+just a "bootcamp graduate" who knows basic JavaScript. 
+You are showing you can handle:
+Memory Management and Type Safety.
+Concurrency (handling multiple trades/chats at once).
+Asynchronous Programming (using tokio).
+2. High-Stakes Logic
+Employers love seeing projects where integrity matters. 
+Building a system that handles "value" (even if it's just tracking it)
+ requires a higher level of testing and logic than a social media clone.
+What to highlight in your portfolio: Show how you handled the 
+"Handshake" logic to prevent double-spending or fake code entries. 
+This proves you think like a Systems Architect, not just a coder.
+3. Solving a Real-World Problem
+This is the "X-factor." You aren't just coding for fun; 
+you are solving a massive, cross-border problem for a specific community.
+The Story: "I built this because I saw migrants in 
+South Africa struggling to send money home due to 
+banking hurdles and high fees."
+The Impact: This shows you have Product Sense—you 
+know how to identify a user need and build a technical solution for it.
+How to structure the GitHub for Recruiters:
+If you want this to get you hired, your GitHub README 
+shouldn't just be code. It should include:
+Architecture Diagram: A simple visual showing how 
+the Axum backend talks to the JS frontend and how the 
+"Pre-Generated Codes" flow between users.
+Privacy Deep-Dive: A section explaining why you chose 
+pecific Rust crates for hashing and why you chose not 
+to store certain user data.
+The "Why Rust?": A paragraph explaining the performance 
+and security benefits of Rust for this specific use case.
+A Pro Tip for your Portfolio:
+Include a "Dispute Resolution" flow in your logic. Even 
+if it's simple, showing that you thought about what happens 
+when things go wrong (e.g., a user claims they didn't get their money) 
+shows a level of professional maturity that recruiters find very rare.

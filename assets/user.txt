@@ -1,0 +1,37 @@
+user interface or model
+
+User ID (Randomly generated)
+Phone Number Hash (For login)
+Trust Score (Integer)
+Active Transaction IDs
+A Small Challe
+
+
+
+3. Middleware for Privacy & Security
+Since you want to collect as little data as 
+possible, you can use Axum Middleware to:
+Rate Limiting: Prevent bots from "guessing" 
+secret codes by limiting how many tries a user gets.
+Minimal Logging: Configure your logger (like tracing)
+ to specifically exclude IP addresses or sensitive 
+payloads, so your server logs stay "clean."
+
+A Small Tip on "Trust" Storage
+Since you aren't taking names, your 
+Trust Score will be linked to the Phone 
+Number Hash. If a user loses their phone, 
+they lose their score—unless you implement a 
+"Recovery Key" (a random string of 12 words)
+ that they can write down. It’s a very common 
+move for privacy-focused apps.
+
+4. Choosing the Right License
+If you go open source, you’ll need to pick a license:
+MIT/Apache: Anyone can use your code for anything (very open).
+GPL: If someone uses your code to build their own 
+app, they must also make their app open source.
+Business Source License (BSL): You could keep it 
+"source available" where people can see the code, 
+but they aren't allowed to use it for a commercial 
+competitor for a few years.
