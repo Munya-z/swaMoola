@@ -20,6 +20,14 @@ pub struct User {
     pub active_transactions: Option<i32>,
 }
 
+#[derive(Serialize, sqlx::FromRow)] // Added FromRow so SQLx can map to it
+pub struct UserResponse {
+    pub id: Uuid,
+    pub name: String,
+    pub trust_score: i32,
+    pub active_transactions: i32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)] 
 pub struct RegisterRequest{
     pub name: String,

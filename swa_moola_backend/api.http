@@ -1,6 +1,10 @@
-@JWTToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3NzY0MTY1OTcsIm5hbWUiOiJydWRvIiwic3ViIjoiYTA0ODliNTktZDc5MS00YWFiLWIyYWUtZjg5NDIxMzgzZmQxIn0.O8UaGG_YKHQkXwDzv0gZazDIyan4uKp74ddAYu1waAw"
+@JWTToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3Nzc0Njk5MzUsIm5hbWUiOiJNdW55YSIsInN1YiI6IjY3ODBiOTllLWNmZGItNDQ1Yi05MTU0LTFhMzg5ZDM3OWYwZCJ9.VV90IobiKdRfZsANDCbOQ5e2fwQWnjqB7q253HOD7eg"
 
-curl -X POST http://127.0.0.1:8000/users/register \
+@URL = "http://127.0.0.1:8000"
+
+@user_id = "6780b99e-cfdb-445b-9154-1a389d379f0d"
+
+curl -X POST {{URL}}/users/register \
      -H "Content-Type: application/json" \
      -d '{
     "name": "Munya",
@@ -10,9 +14,25 @@ curl -X POST http://127.0.0.1:8000/users/register \
 
 
 ###
-curl -X POST http://127.0.0.1:8000/users/login \
+curl -X POST {{URL}}/users/login \
      -H "Content-Type: application/json" \
      -d '{
     "phone_number" : "+27627197691",
     "password" : "munya456"
+    }'
+
+###
+curl -X PUT {{URL}}/api/uu/ts/{{user_id}} \
+     -H {{JWTToken}} \
+     -H "Content-Type: application/json" \
+     -d '{
+    "score": 2
+    }'
+
+###
+curl -X PUT {{URL}}/api/uu/at/{{user_id}} \
+     -H {{JWTToken}} \
+     -H "Content-Type: application/json" \
+     -d '{
+    "option": "start"
     }'

@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT c.conv_id as \"conv_id!\", \n            c.is_group as \"is_group!\", \n            c.created_at as \"created_at!\" FROM Conversations c\n            JOIN Conversation_participants cp ON c.conv_id = cp.conv_id\n            WHERE cp.user_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "conv_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "is_group!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "created_at!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "a39ce67c9830bef3b5a776f8e80ad41e02ccab25886b81f386cbc17041c55a0a"
+}

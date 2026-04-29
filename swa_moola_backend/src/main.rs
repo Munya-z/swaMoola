@@ -1,10 +1,12 @@
 use std::env;
 use sqlx::{postgres::{PgPoolOptions, PgPool} };
-use axum::{Router,routing::get, middleware as axum_middleware};
-use axum::http::{HeaderValue, Method};
+use axum::{middleware as axum_middleware};
+use axum::{http::{HeaderValue, Method}, Router,routing::get};
 use tower_http::cors::{Any, CorsLayer};
 
+pub mod db; 
 mod users;
+mod chats;
 mod middleware;
 use middleware::auth_middleware;
 
@@ -29,9 +31,10 @@ async fn main() {
         .route("/", get(root))
         .nest("/users", users::routes());
 
-    // let protected_routes = Router::new()
-    // //     .nest("/inventory", inventory::routes())    
-    //     .layer(axum_middleware::from_fn(auth_middleware));
+    let protected_routes = Router::new()
+        .nest("/uu", users::protected_routes())
+        .nest("/m", chats:: routes())  
+        .layer(axum_middleware::from_fn(auth_middleware));
 
     let cors = CorsLayer::new()
         .allow_origin("http://localhost:4200".parse::<HeaderValue>().unwrap()) // Explicitly allow your frontend
@@ -40,7 +43,7 @@ async fn main() {
 
     let app = Router::new()
         .merge(public_routes)
-        // .nest("/api",protected_routes)
+        .nest("/api",protected_routes)
         // .fallback_service(ServeDir::new("dist/your-angular-project/browser"))
         .layer(cors)
         .with_state(pool);

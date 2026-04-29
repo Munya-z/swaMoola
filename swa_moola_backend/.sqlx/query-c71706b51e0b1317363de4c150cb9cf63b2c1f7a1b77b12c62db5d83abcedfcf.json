@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT c.conv_id\n        FROM Conversations c\n        JOIN Conversation_participants cp1 ON c.conv_id = cp1.conv_id\n        JOIN Conversation_participants cp2 ON c.conv_id = cp2.conv_id\n        WHERE cp1.user_id = $1 \n          AND cp2.user_id = $2 \n          AND c.is_group = false\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "conv_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c71706b51e0b1317363de4c150cb9cf63b2c1f7a1b77b12c62db5d83abcedfcf"
+}
