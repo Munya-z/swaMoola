@@ -59,14 +59,14 @@ pub async fn register_user(
     State(pool): State<PgPool>,
     Json(payload): Json<RegisterRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let user_uuid = create_user(&pool, payload.name, payload.phone_number, payload.password)
+    let user = create_user(&pool, payload.name, payload.phone_number, payload.password)
         .await
         .map_err(|e| {
             println!("error from creating uuid : {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    Ok((StatusCode::CREATED, Json(user_uuid)))
+    Ok((StatusCode::CREATED, Json(user)))
 }
 
 pub async fn verify_user(

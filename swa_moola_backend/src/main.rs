@@ -35,11 +35,11 @@ async fn main() {
         .nest("/uu", users::protected_routes())
         .nest("/m", chats:: routes())  
         .layer(axum_middleware::from_fn(auth_middleware));
-
+    
     let cors = CorsLayer::new()
-        .allow_origin("http://localhost:4200".parse::<HeaderValue>().unwrap()) // Explicitly allow your frontend
-        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
-        .allow_headers(Any);
+    .allow_origin("http://localhost:8080".parse::<HeaderValue>().unwrap()) // Explicitly allow your frontend
+    .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
+    .allow_headers(Any);
 
     let app = Router::new()
         .merge(public_routes)

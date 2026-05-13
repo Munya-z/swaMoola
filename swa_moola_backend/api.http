@@ -1,14 +1,30 @@
-@JWTToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3Nzc0Njk5MzUsIm5hbWUiOiJNdW55YSIsInN1YiI6IjY3ODBiOTllLWNmZGItNDQ1Yi05MTU0LTFhMzg5ZDM3OWYwZCJ9.VV90IobiKdRfZsANDCbOQ5e2fwQWnjqB7q253HOD7eg"
+@JWTToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3Nzg3NDgzNzYsIm5hbWUiOiJtdW55YSIsInN1YiI6ImQ4ZWE4ODE5LWNjYjMtNDU1YS04OGMyLWZiZDBlOWFlNTRkZCJ9.xW_GmI89ULLxz3maZvNJ_G6IHodzYjnnvwJEWX7v20A"
+
+@RecipientToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3Nzg3NDgyMTMsIm5hbWUiOiJzYXJhIiwic3ViIjoiNjhhZmU4ZmMtODY5Yy00MTQ1LTllZGQtZWI2NTFkMzI0M2RjIn0.riTVmWjpfd6RECLiXkrRi8SNhXj0KxZge2c2kbEedxY"
+
+@OtherToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3Nzg3NTQ4ODAsIm5hbWUiOiJqYW1lcyIsInN1YiI6ImQxOGYzYjdhLTI2ZWMtNGZlNi1iOWNhLWE3NDc2MDFlZjY1MSJ9.gVDB0mBbb9MmcrVsOFXFnaieZaFw1QDS1Riu0I_i6hs"
 
 @URL = "http://127.0.0.1:8000"
 
-@user_id = "6780b99e-cfdb-445b-9154-1a389d379f0d"
+@user_id = "d8ea8819-ccb3-455a-88c2-fbd0e9ae54dd"
+
+@recipient_id = "68afe8fc-869c-4145-9edd-eb651d3243dc"
+
+@other_id = "d18f3b7a-26ec-4fe6-b9ca-a747601ef651"
 
 curl -X POST {{URL}}/users/register \
      -H "Content-Type: application/json" \
      -d '{
-    "name": "Munya",
-    "phone_number" : "+27627197691",
+    "name": "james",
+    "phone_number" : "+27627197692",
+    "password" : "munya456"
+    }'
+
+###
+curl -X POST {{URL}}/users/login \
+     -H "Content-Type: application/json" \
+     -d '{
+    "phone_number" : "+27627197692",
     "password" : "munya456"
     }'
 
@@ -34,5 +50,75 @@ curl -X PUT {{URL}}/api/uu/at/{{user_id}} \
      -H {{JWTToken}} \
      -H "Content-Type: application/json" \
      -d '{
-    "option": "start"
+    "option": "Start"
+    }'
+
+###
+curl -X POST {{URL}}/api/m/sm/{{user_id}} \
+     -H {{JWTToken}} \
+     -H "Content-Type: application/json" \
+     -d '{
+     "sender_id": {{user_id}},
+     "recipient_id": {{recipient_id}},
+     "content": "Hello, are you still awake?"
+    }'
+
+
+###
+curl -X POST {{URL}}/api/m/sm/{{user_id}} \
+     -H {{JWTToken}} \
+     -H "Content-Type: application/json" \
+     -d '{
+     "sender_id": {{user_id}},
+     "recipient_id": {{other_id}},
+     "content": "Hello, james?"
+    }'
+
+###
+curl -X POST {{URL}}/api/m/sm/{{user_id}} \
+     -H {{JWTToken}} \
+     -H "Content-Type: application/json" \
+     -d '{
+     "sender_id": {{other_id}},
+     "recipient_id": {{user_id}},
+     "content": "Hello, yes its james, wanna work"
+    }'
+
+###
+curl -X POST {{URL}}/api/m/sm/{{recipient_id}} \
+     -H {{RecipientToken}} \
+     -H "Content-Type: application/json" \
+     -d '{
+     "sender_id": {{recipient_id}},
+     "recipient_id": {{user_id}},
+     "content": "Hello, yes i am"
+    }'
+
+###
+curl -X GET {{URL}}/api/m/conversations/{{recipient_id}} \
+     -H {{RecipientToken}} \
+
+###
+curl -X POST {{URL}}/api/m/ch/{{user_id}} \
+     -H {{RecipientToken}} \
+     -H "Content-Type: application/json" \
+     -d '{
+     "conv_id": "c668b391-6ba6-45f3-ab99-fc180bd42803",
+     "current_user_id": {{user_id}}
+    }'
+
+###
+curl -X POST {{URL}}/api/m/{{recipient_id}} \
+     -H {{RecipientToken}} \
+     -H "Content-Type: application/json" \
+     -d '{
+     "conv_id": "c668b391-6ba6-45f3-ab99-fc180bd42803"
+    }'
+###
+
+curl -X GET {{URL}}/api/m/participants/{{recipient_id}} \
+     -H {{RecipientToken}} \
+     -H "Content-Type: application/json" \
+     -d '{
+     "conv_id": "a4d32357-7a21-44ac-983e-75fdb129c3dc"
     }'

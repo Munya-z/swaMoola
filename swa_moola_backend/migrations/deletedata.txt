@@ -1,0 +1,9 @@
+-- Enable the scheduling extension
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+-- Automatically hard-delete messages older than 7 days every night at midnight
+SELECT cron.schedule(
+    'purge-expired-messages',
+    '0 0 * * *', -- Standard cron syntax for 12:00 AM
+    $$ DELETE FROM messages WHERE timestamp < NOW() - INTERVAL '7 days'; $$
+);

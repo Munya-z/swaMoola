@@ -1,9 +1,8 @@
 use uuid::Uuid;
 use sqlx::PgPool;
 use axum::{extract::{State, Path}, Json, response::IntoResponse, http::StatusCode};
-use crate::chats::models::{Conversation, ConversationParticipant, Message, MessagePayload};
+use crate::chats::models::{Conversation, ConversationParticipant, Message, MessagePayload, GroupPayload, ConversationNamePayload};
 use crate::db::begin_rls_txn;
-
 
 pub async fn create_conversation(
     executor: impl sqlx::PgExecutor<'_>, 
@@ -14,7 +13,12 @@ pub async fn create_conversation(
         INSERT INTO conversations (is_group)
 
         VALUES ($1)
-        RETURNING conv_id as "conv_id!", is_group as "is_group!", created_at as "created_at!"
+        RETURNING 
+        COALESCE(name, 'New Chat') as "name!",
+        conv_id as "conv_id!", 
+        is_group as "is_group!", 
+        created_at as "created_at!",
+        NULL::text as "display_name"
         "#,
         false 
     );
@@ -24,6 +28,50 @@ pub async fn create_conversation(
     Ok(new_conversation)
 }
 
+pub async fn make_a_group_conversation(
+    State(pool): State<PgPool>,
+    Path(user_id): Path<Uuid>,
+    Json(payload): Json<GroupPayload>
+)-> impl IntoResponse {
+
+    let mut tx = match begin_rls_txn(&pool, user_id).await{
+        Ok(tx) => tx,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+
+    let group_convo_result   = sqlx::query_as!(
+        Conversation,r#"
+        UPDATE conversations
+        SET name = $1, is_group = true
+        WHERE conv_id = $2
+        RETURNING name as "name!",
+        conv_id as "conv_id!",
+        is_group as "is_group!",
+        created_at as "created_at!",
+        name as "display_name"
+        "#,
+        payload.name,
+        payload.conv_id
+    )
+    .fetch_one(&mut *tx) 
+    .await;
+
+    let convo = match group_convo_result {
+        Ok(c) => c,
+        Err(e) => return (StatusCode::NOT_FOUND, format!("Conversation not found: {}", e)).into_response(),
+    };
+    
+    if let Err(e) = add_conversation_participant(&mut *tx, payload.conv_id, payload.other_user_id).await {
+        return (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to add participant: {}", e)).into_response();
+    }
+
+    if let Err(e) = tx.commit().await {
+        return (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to commit: {}", e)).into_response();
+    }
+
+    (StatusCode::OK, Json(convo)).into_response()
+
+}
 
 pub async fn add_conversation_participant(
     executor: impl sqlx::PgExecutor<'_>, 
@@ -44,9 +92,9 @@ pub async fn add_conversation_participant(
     let new_participant =  query.fetch_one(executor) 
     .await?;
 
+
     Ok(new_participant)
 }
-
 
 pub async fn add_message_to_db(
     executor: impl sqlx::PgExecutor<'_>, 
@@ -73,7 +121,6 @@ pub async fn add_message_to_db(
     Ok(new_message)
     
 }
-
 
 pub async fn find_existing_conversation(
     executor: impl sqlx::PgExecutor<'_>, 
@@ -123,6 +170,7 @@ pub async fn send_message(
                     return (StatusCode::INTERNAL_SERVER_ERROR, Json(e.to_string())).into_response()
                 }
             };
+            println!("Created new conversation with ID: {}", conv.conv_id);
             let _= add_conversation_participant(&mut *tx, conv.conv_id, payload.sender_id).await;
             let _= add_conversation_participant(&mut *tx, conv.conv_id, payload.recipient_id).await;
             conv.conv_id
@@ -147,4 +195,52 @@ pub async fn send_message(
     };
 
     message
+}
+
+pub async fn get_conversation_header(
+    State(pool): State<PgPool>,
+    Path(user_id): Path<Uuid>,
+    Json(payload): Json<ConversationNamePayload>
+) -> impl IntoResponse {
+
+    let mut tx = match begin_rls_txn(&pool, user_id).await{
+        Ok(tx) => tx,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+
+    let convo_result = sqlx::query_as!(
+        Conversation,
+        r#"
+        SELECT 
+            c.conv_id as "conv_id!", 
+            c.is_group as "is_group!", 
+            c.created_at as "created_at!", 
+            COALESCE(c.name, 'Untitled') as "name!", 
+            (
+                SELECT u.name 
+                FROM conversation_participants cp
+                JOIN users u ON u.id = cp.user_id
+                WHERE cp.conv_id = c.conv_id AND cp.user_id != $2
+                LIMIT 1
+            ) as "display_name" 
+        FROM conversations c
+        WHERE c.conv_id = $1
+        "#,
+        payload.conv_id,
+        user_id
+    )
+    .fetch_one(&mut *tx)
+    .await;
+
+    match convo_result {
+        Ok(convo) => {
+            if let Err(e) = tx.commit().await {
+                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+            } else {
+                (StatusCode::OK, Json(convo)).into_response()
+            }
+        }
+        Err(e) => (StatusCode::NOT_FOUND, format!("Conversation not found: {}", e)).into_response(),
+    }
+
 }
