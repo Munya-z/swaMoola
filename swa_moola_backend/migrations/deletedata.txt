@@ -7,3 +7,23 @@ SELECT cron.schedule(
     '0 0 * * *', -- Standard cron syntax for 12:00 AM
     $$ DELETE FROM messages WHERE timestamp < NOW() - INTERVAL '7 days'; $$
 );
+
+
+to change the time stamp ;
+
+
+-- 1. Create a function that rounds the current timestamp to the nearest hour
+CREATE OR REPLACE FUNCTION coarsen_message_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- date_trunc('hour', NOW()) drops minutes, seconds, and milliseconds
+    NEW.created_at := date_trunc('hour', NOW());
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2. Bind it to fire BEFORE a row is saved to the messages table
+CREATE TRIGGER trg_before_message_insert
+BEFORE INSERT ON messages
+FOR EACH ROW
+EXECUTE FUNCTION coarsen_message_timestamp();

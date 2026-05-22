@@ -23,7 +23,8 @@ pub struct LoginResponse {
 }
 
 #[derive(Serialize)]
-pub struct LoginCredentials<'a> {
-    pub phone_number: &'a str,
-    pub password: &'a str,
+pub struct LoginCredentials {
+    pub phone_number: String,
+    pub password: String,
 }
+

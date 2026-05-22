@@ -50,7 +50,9 @@ pub async fn get_user_conversations(
             c.is_group as "is_group!", 
             COALESCE(c.name, 'Untitled') as "name!",
             c.name as "display_name", 
-            c.created_at as "created_at!" FROM Conversations c
+            c.created_at as "created_at!",
+            c.last_message_id as "last_message_id?"
+            FROM Conversations c
             JOIN Conversation_participants cp ON c.conv_id = cp.conv_id
             WHERE cp.user_id = $1
         "#,

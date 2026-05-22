@@ -10,12 +10,25 @@ pub struct Conversation {
     pub is_group: bool,
     pub created_at: DateTime<Utc>,
     pub display_name: Option<String>,
+    pub last_message_id : Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)] 
 pub struct ConversationParticipant {
     pub conv_id: Uuid,
     pub user_id: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ConversationPayload {
+    pub conv_id: Uuid,
+    pub is_group: bool,
+    pub created_at: DateTime<Utc>,
+    pub name: String,
+    pub display_name: Option<String>,
+    pub last_msg_content: Option<String>,
+    pub last_msg_date: Option<DateTime<Utc>>,
+    pub last_msg_sender: Option<Uuid>,
 }
 
 #[derive(Serialize, sqlx::FromRow)] 

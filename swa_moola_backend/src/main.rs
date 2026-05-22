@@ -3,6 +3,8 @@ use sqlx::{postgres::{PgPoolOptions, PgPool} };
 use axum::{middleware as axum_middleware};
 use axum::{http::{HeaderValue, Method}, Router,routing::get};
 use tower_http::cors::{Any, CorsLayer};
+use axum::http::header::{AUTHORIZATION, CONTENT_TYPE, UPGRADE, CONNECTION};
+use crate::chats::ws::ws_handler;
 
 pub mod db; 
 mod users;
@@ -37,14 +39,19 @@ async fn main() {
         .layer(axum_middleware::from_fn(auth_middleware));
     
     let cors = CorsLayer::new()
-    .allow_origin("http://localhost:8080".parse::<HeaderValue>().unwrap()) // Explicitly allow your frontend
+    .allow_origin([
+        "http://localhost:8080".parse().unwrap(),
+        "http://127.0.0.1:8080".parse().unwrap()
+    ])
     .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
-    .allow_headers(Any);
+    .allow_headers([AUTHORIZATION, CONTENT_TYPE, UPGRADE, CONNECTION])
+    .allow_credentials(true);
 
     let app = Router::new()
         .merge(public_routes)
         .nest("/api",protected_routes)
         // .fallback_service(ServeDir::new("dist/your-angular-project/browser"))
+        .route("/api/ws/{id}", get(ws_handler))
         .layer(cors)
         .with_state(pool);
 

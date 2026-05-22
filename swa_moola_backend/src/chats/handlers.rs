@@ -1,7 +1,7 @@
 use uuid::Uuid;
 use sqlx::PgPool;
 use axum::{extract::{State, Path}, Json, response::IntoResponse, http::StatusCode};
-use crate::chats::models::{Conversation, ConversationParticipant, Message, MessagePayload, GroupPayload, ConversationNamePayload};
+use crate::chats::models::{Conversation, ConversationParticipant, Message, MessagePayload, GroupPayload, ConversationPayload, ConversationNamePayload};
 use crate::db::begin_rls_txn;
 
 pub async fn create_conversation(
@@ -18,7 +18,8 @@ pub async fn create_conversation(
         conv_id as "conv_id!", 
         is_group as "is_group!", 
         created_at as "created_at!",
-        NULL::text as "display_name"
+        NULL::text as "display_name",
+        NULL::uuid as "last_message_id"
         "#,
         false 
     );
@@ -48,7 +49,8 @@ pub async fn make_a_group_conversation(
         conv_id as "conv_id!",
         is_group as "is_group!",
         created_at as "created_at!",
-        name as "display_name"
+        name as "display_name",
+        last_message_id as "last_message_id?"
         "#,
         payload.name,
         payload.conv_id
@@ -73,8 +75,30 @@ pub async fn make_a_group_conversation(
 
 }
 
+pub async fn add_last_message_to_conversation(
+    executor: &mut sqlx::PgConnection, 
+    conv_id: Uuid,
+    msg_id: Uuid
+) -> anyhow::Result<()> {
+
+    
+    sqlx::query!(
+        r#"
+        UPDATE conversations
+        SET last_message_id = $2 
+        WHERE conv_id = $1
+        "#,
+        conv_id,
+        msg_id
+    ).execute(executor)
+    .await?;
+
+    Ok(())
+    
+}
+
 pub async fn add_conversation_participant(
-    executor: impl sqlx::PgExecutor<'_>, 
+    executor: &mut sqlx::PgConnection, 
     conv_id: Uuid,
     user_id: Uuid
 ) -> anyhow::Result<ConversationParticipant> {
@@ -97,7 +121,7 @@ pub async fn add_conversation_participant(
 }
 
 pub async fn add_message_to_db(
-    executor: impl sqlx::PgExecutor<'_>, 
+    executor: &mut sqlx::PgConnection, 
     user_id:Uuid, 
     conv_id: Uuid,
     content: String
@@ -115,8 +139,11 @@ pub async fn add_message_to_db(
         content 
     );
 
-    let new_message = query.fetch_one(executor) 
+
+    let new_message =query.fetch_one(&mut *executor)
     .await?;
+
+    let _ = add_last_message_to_conversation(&mut *executor, conv_id, new_message.msg_id).await?;
 
     Ok(new_message)
     
@@ -209,22 +236,33 @@ pub async fn get_conversation_header(
     };
 
     let convo_result = sqlx::query_as!(
-        Conversation,
+        ConversationPayload,
         r#"
-        SELECT 
-            c.conv_id as "conv_id!", 
-            c.is_group as "is_group!", 
-            c.created_at as "created_at!", 
-            COALESCE(c.name, 'Untitled') as "name!", 
-            (
-                SELECT u.name 
-                FROM conversation_participants cp
-                JOIN users u ON u.id = cp.user_id
-                WHERE cp.conv_id = c.conv_id AND cp.user_id != $2
-                LIMIT 1
-            ) as "display_name" 
-        FROM conversations c
-        WHERE c.conv_id = $1
+            SELECT 
+                c.conv_id as "conv_id!", 
+                c.is_group as "is_group!", 
+                c.created_at as "created_at!",
+                COALESCE(c.name, 'Untitled') as "name!",
+                -- Subquery to dynamically set the display name based on participant or group name
+                COALESCE(CASE 
+                    WHEN c.is_group = TRUE THEN COALESCE(c.name, 'Untitled Group')
+                    ELSE (
+                        SELECT u.name 
+                        FROM conversation_participants cp_other
+                        JOIN users u ON u.id = cp_other.user_id
+                        WHERE cp_other.conv_id = c.conv_id AND cp_other.user_id != $2
+                        LIMIT 1
+                    )
+                END, 'Untitled')::text AS "display_name!",
+                m.content AS "last_msg_content?",
+                m.created_at AS "last_msg_date?",
+                m.sender_id AS "last_msg_sender?"
+            FROM conversations c
+            JOIN conversation_participants cp ON c.conv_id = cp.conv_id
+            LEFT JOIN messages m ON c.last_message_id = m.msg_id
+            WHERE c.conv_id = $1 AND cp.user_id = $2
+            ORDER BY m.created_at DESC NULLS LAST;
+
         "#,
         payload.conv_id,
         user_id
@@ -242,5 +280,7 @@ pub async fn get_conversation_header(
         }
         Err(e) => (StatusCode::NOT_FOUND, format!("Conversation not found: {}", e)).into_response(),
     }
-
 }
+
+
+

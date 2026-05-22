@@ -1,10 +1,12 @@
-use axum::{Json, extract::{ State}, http::StatusCode,response::IntoResponse};
+use axum::{Json, extract::{ State, Path}, http::StatusCode,response::IntoResponse};
 use sqlx::{PgPool};
 use uuid::Uuid;
 use sha2::{Sha256, Digest};
 use std::{env};
+use serde::{Serialize, Deserialize};
 use jsonwebtoken::{encode, Header, EncodingKey};
 use chrono::{Utc, Duration};
+use rand::Rng;
 use argon2::{password_hash::{rand_core::OsRng, PasswordHasher, SaltString},Argon2, PasswordHash, PasswordVerifier};
 
 use crate::users::models::{AuthResponse, AuthenticatedUser, LoginRequest, RegisterRequest, User, UserResponse};
@@ -34,20 +36,22 @@ async fn create_user(
     let phone_number_hash = hex::encode(hasher.finalize());
 
     let new_id = Uuid::new_v4();
+    let new_key = generate_discoverable_key();
 
     let new_user = sqlx::query_as!(
         UserResponse,r#"
-        INSERT INTO users (id, name,phone_number_hash , password_hash, trust_score, active_transactions)
+        INSERT INTO users (id, name,phone_number_hash , password_hash, trust_score, active_transactions, discoverable_key)
 
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, name, trust_score as "trust_score!", active_transactions as "active_transactions!"
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, name, trust_score as "trust_score!", active_transactions as "active_transactions!", discoverable_key as "discoverable_key!"
     "#,
     new_id,
     name,
     phone_number_hash,
     password_hash,
     trust_score ,
-    active_transactions 
+    active_transactions,
+    new_key
     )
     .fetch_one(pool) 
     .await?;
@@ -82,7 +86,7 @@ pub async fn verify_user(
     let phone_hash_hex = hex::encode(hasher.finalize());
 
     let user : User = sqlx::query_as!(
-        User ,"SELECT id, name, phone_number_hash, password_hash ,trust_score as \"trust_score!\", active_transactions as \"active_transactions!\"  FROM users WHERE phone_number_hash = $1",
+        User ,"SELECT id, name, phone_number_hash, password_hash ,trust_score as \"trust_score!\", active_transactions as \"active_transactions!\", discoverable_key as \"discoverable_key!\"  FROM users WHERE phone_number_hash = $1",
         phone_hash_hex
     )
     .fetch_optional(pool)
@@ -101,6 +105,7 @@ pub async fn verify_user(
         name: Some(user.name),
         trust_score: user.trust_score,
         active_transactions: user.active_transactions,
+        discoverable_key: Some(user.discoverable_key),
     })
 }
 
@@ -145,3 +150,90 @@ pub async fn login_handler(
     Ok(Json(AuthResponse { token, user }))
 }
 
+#[derive(Deserialize)]
+pub struct SearchRequest {
+    pub key: String,
+}
+
+#[derive(Serialize)]
+pub struct SearchResponse {
+    pub target_user_id: Uuid,
+    pub name: String,
+}
+
+pub async fn search_by_discoverable_key(
+    State(pool): State<PgPool>,
+    Json(payload): Json<SearchRequest>,
+) -> Result<Json<SearchResponse>, (StatusCode, String)> {
+    // Enforce strict 12-character validation right away to prevent database spamming
+    if payload.key.len() != 12 {
+        return Err((StatusCode::BAD_REQUEST, "Invalid key format".to_string()));
+    }
+
+    // Query the database for an exact, case-sensitive match
+    let result = sqlx::query!(
+        "SELECT id, name FROM users WHERE discoverable_key = $1",
+        payload.key
+    )
+    .fetch_optional(&pool)
+    .await;
+
+    match result {
+        Ok(Some(user)) => {
+            // Found! Return ONLY the minimal details needed to request a connection
+            Ok(Json(SearchResponse {
+                target_user_id: user.id,
+                name: user.name,
+            }))
+        }
+        Ok(None) => {
+            // Keep error messages generic so attackers can't guess profiles
+            Err((StatusCode::NOT_FOUND, "No user found with that key".to_string()))
+        }
+        Err(e) => {
+            eprintln!("Database lookup failure: {e}");
+            Err((StatusCode::INTERNAL_SERVER_ERROR, "Search failed".to_string()))
+        }
+    }
+}
+
+pub fn generate_discoverable_key() -> String {
+    // A customized alphabet that removes 0, O, 1, I, and l to completely avoid typos
+    const ALLOWED_CHARS: &[u8] = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    let mut rng = rand::thread_rng();
+    
+    // Allocate exactly 12 characters of space upfront for efficiency
+    let key: String = (0..12)
+        .map(|_| {
+            let idx = rng.gen_range(0..ALLOWED_CHARS.len());
+            ALLOWED_CHARS[idx] as char
+        })
+        .collect();
+
+    key
+}
+
+pub async fn refresh_user_key(
+    State(pool): State<PgPool>,
+    Path(user_id): Path<Uuid>,
+) -> impl IntoResponse {
+    // 1. Generate the fresh 12-character token
+    let new_key = generate_discoverable_key();
+
+    // 2. Save it to your updated users table
+    let update_result = sqlx::query!(
+        "UPDATE users SET discoverable_key = $1 WHERE id = $2",
+        new_key,
+        user_id
+    )
+    .execute(&pool)
+    .await;
+
+    match update_result {
+        Ok(_) => (StatusCode::OK, new_key),
+        Err(e) => {
+            eprintln!("Failed to save new discoverable key: {e}");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to generate key".to_string())
+        }
+    }
+}

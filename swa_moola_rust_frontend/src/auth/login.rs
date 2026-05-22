@@ -1,7 +1,5 @@
 use leptos_router::{components::*, hooks::use_navigate};
 use leptos::{prelude::*,task::spawn_local, ev, serde_json};
-use uuid::Uuid;
-
 use crate::auth_state::AuthState;
 use crate::auth::models::{ LoginResponse, LoginCredentials };
 
@@ -22,14 +20,17 @@ pub fn LoginComponent() -> impl IntoView {
         set_error_msg.set(None);
 
         let navigate = navigate.clone(); 
-        let phone_val = phone_number.get();
+        let phone_val = phone_number.get()
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>();
         let pass_val = password.get();
         
         spawn_local(async move {
             let client = reqwest::Client::new();
             let res : Result<reqwest::Response, reqwest::Error> = client
                 .post("http://localhost:8000/users/login") 
-                .json(&LoginCredentials { phone_number: &phone_val, password: &pass_val })
+                .json(&LoginCredentials { phone_number: phone_val, password: pass_val })
                 .send()
                 .await;
 

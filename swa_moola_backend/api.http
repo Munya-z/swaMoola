@@ -1,15 +1,15 @@
-@JWTToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3Nzg3NDgzNzYsIm5hbWUiOiJtdW55YSIsInN1YiI6ImQ4ZWE4ODE5LWNjYjMtNDU1YS04OGMyLWZiZDBlOWFlNTRkZCJ9.xW_GmI89ULLxz3maZvNJ_G6IHodzYjnnvwJEWX7v20A"
+@JWTToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3Nzk0NTExODYsIm5hbWUiOiJtdW55YSIsInN1YiI6IjY5ZDVkYzA0LWE1Y2UtNGVjOS05YzBhLTFkNzE3ZWY1NTJlYiJ9.H90mxBl1AN_PsptyvpmvLgcCGWWLWObve1Unpz8rD-Y"
 
 @RecipientToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3Nzg3NDgyMTMsIm5hbWUiOiJzYXJhIiwic3ViIjoiNjhhZmU4ZmMtODY5Yy00MTQ1LTllZGQtZWI2NTFkMzI0M2RjIn0.riTVmWjpfd6RECLiXkrRi8SNhXj0KxZge2c2kbEedxY"
 
-@OtherToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3Nzg3NTQ4ODAsIm5hbWUiOiJqYW1lcyIsInN1YiI6ImQxOGYzYjdhLTI2ZWMtNGZlNi1iOWNhLWE3NDc2MDFlZjY1MSJ9.gVDB0mBbb9MmcrVsOFXFnaieZaFw1QDS1Riu0I_i6hs"
+@OtherToken = "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3NzkyNzY2MDksIm5hbWUiOiJqYW1lcyIsInN1YiI6ImQxOGYzYjdhLTI2ZWMtNGZlNi1iOWNhLWE3NDc2MDFlZjY1MSJ9.lqnhIF73t4Qe8AyNYcyJYemHLVzYzi642glQ0XY-FQc"
 
 @URL = "http://127.0.0.1:8000"
 
-@user_id = "d8ea8819-ccb3-455a-88c2-fbd0e9ae54dd"
-
-@recipient_id = "68afe8fc-869c-4145-9edd-eb651d3243dc"
-
+@user_id = "69d5dc04-a5ce-4ec9-9c0a-1d717ef552eb"
+# "discoverable_key": "3MLWDkT3daXG"
+@recipient_id = "9a6b0610-8ebe-4adb-ab8a-3388248ee6d6"
+#  "discoverable_key": "7rCQ3UjxFKqf"
 @other_id = "d18f3b7a-26ec-4fe6-b9ca-a747601ef651"
 
 curl -X POST {{URL}}/users/register \
@@ -46,11 +46,11 @@ curl -X PUT {{URL}}/api/uu/ts/{{user_id}} \
     }'
 
 ###
-curl -X PUT {{URL}}/api/uu/at/{{user_id}} \
+curl -X POST {{URL}}/api/uu/sk/{{user_id}} \
      -H {{JWTToken}} \
      -H "Content-Type: application/json" \
      -d '{
-    "option": "Start"
+    "key": "7rCQ3UjxFKqf"
     }'
 
 ###
@@ -95,16 +95,15 @@ curl -X POST {{URL}}/api/m/sm/{{recipient_id}} \
     }'
 
 ###
-curl -X GET {{URL}}/api/m/conversations/{{recipient_id}} \
-     -H {{RecipientToken}} \
+curl -X GET {{URL}}/api/m/conversations/{{user_id}} \
+     -H {{JWTToken}} \
 
 ###
 curl -X POST {{URL}}/api/m/ch/{{user_id}} \
-     -H {{RecipientToken}} \
+     -H {{JWTToken}} \
      -H "Content-Type: application/json" \
      -d '{
-     "conv_id": "c668b391-6ba6-45f3-ab99-fc180bd42803",
-     "current_user_id": {{user_id}}
+     "conv_id": "0e31b470-612d-426b-b12f-d957f08a6315"
     }'
 
 ###
@@ -116,8 +115,8 @@ curl -X POST {{URL}}/api/m/{{recipient_id}} \
     }'
 ###
 
-curl -X GET {{URL}}/api/m/participants/{{recipient_id}} \
-     -H {{RecipientToken}} \
+curl -X GET  {{URL}}/api/m/participants/{{user_id}} \
+     -H {{JWTToken}} \
      -H "Content-Type: application/json" \
      -d '{
      "conv_id": "a4d32357-7a21-44ac-983e-75fdb129c3dc"

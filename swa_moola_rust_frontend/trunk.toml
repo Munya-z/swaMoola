@@ -1,3 +1,11 @@
 # [[proxy]]
 # rewrite = "/"
 # backend = "http://127.0.0"
+
+[watch]
+# Don't watch target, dist, or hidden folders
+ignore = [
+    "target",
+    "dist",
+    # ".trunk"
+]

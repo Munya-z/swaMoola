@@ -17,6 +17,7 @@ use auth_state::AuthState;
 
 #[component]
 pub fn App() -> impl IntoView {
+    console_error_panic_hook::set_once();
 
     let initial_token = window()
         .local_storage().ok().flatten()
@@ -33,7 +34,12 @@ pub fn App() -> impl IntoView {
                 <A href="/" exact=true attr:class="aria-[current=page]:underline" >"Home"</A>
                 {move || match auth_state.get().token{
                     Some(_) => view! {
+                        <div class="sm:hidden">
                         <A href="/chats" attr:class="aria-[current=page]:underline " >"Chats"</A> 
+                        </div>
+                        <div class="hidden sm:block">
+                        <A href="/chats/c" attr:class="aria-[current=page]:underline " >"Chats"</A> 
+                        </div>
                     }.into_any(),
                     None => view! {
                         <A href="/login" attr:class="aria-[current=page]:underline " >"Login"</A>
@@ -47,6 +53,7 @@ pub fn App() -> impl IntoView {
                     <Route path=path!("/login") view=LoginComponent/>
                     <Route path=path!("/register") view=RegisterComponent/>
                     <Route path=path!("/chats") view=ChatsList/>
+                    <Route path=path!("/chats/c") view=OpenChat/>
                     // Dynamic parameter example
                     <Route path=path!("/chats/:id") view=OpenChat/>
                 </Routes>
@@ -56,7 +63,15 @@ pub fn App() -> impl IntoView {
 }
 
 fn main() {
-    // Mount the App component to the <body> of the HTML
-    // _ = console_log::init_with_level(log::Level::Debug);
+
     leptos::mount::mount_to_body(App);
 }
+
+
+// CREATE TABLE user_presence (
+//     user_id BIGINT PRIMARY KEY,
+//     last_seen TIMESTAMP WITH TIME ZONE,
+//     is_visible BOOLEAN DEFAULT TRUE -- The user's privacy preference
+// );
+
+

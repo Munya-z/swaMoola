@@ -1,0 +1,10 @@
+here are the fetures i have.
+
+pgp E2EE encryption,
+7 day message deletion,
+True delete( all copies of any message are all deleted),
+text messaging,
+voice messaging,
+voice and video calling,
+seacrh for users by 12 character discoverable keys so no person can guesss your name and randpmly text you,
+all phone numbers used to login are hashed and only the hash is stored in the database

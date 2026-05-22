@@ -1,0 +1,124 @@
+add this to cargo.tmol
+
+[profile.release]
+strip = true      # Automatically removes all symbols and debug info
+opt-level = "z"   # Optimizes for minimum binary size
+lto = true  
+
+Option B: PostgreSQL Partitioning (Best for High Performance)
+If your app scales to millions of messages,
+ running a massive DELETE query can lock up
+ your database tables. Instead, use Table Partitioning by
+ Range based on dates.You create a new mini-table (partition) 
+for each day.To delete old messages, your server simply 
+runs a DROP TABLE command on the partition that is 8 days old. 
+Dropping a table takes milliseconds and uses almost 
+zero server processing power.
+
+
+2. Use WebSockets for Messaging (Crucial)Do not let your 
+Tauri apps use standard HTTP requests (POST /api/send_message) 
+for chatting. At 4 million users, the overhead of opening and 
+closing millions of HTTP connections will overwhelm Axum.
+The Fix: Use WebSockets (via Axum’s axum::extract::ws module). 
+When a user opens the Tauri app, it establishes one persistent 
+WebSocket connection. Messages flow back and forth instantly 
+over this single open pipe, reducing your server's network load 
+by over 80%.
+
+Use Modern Cryptography (Not RSA): Traditional PGP often relies 
+on RSA keys, which are large, heavy, and slow to process on 
+mobile devices or computers. For a messaging app, you should 
+use modern, lightweight elliptic-curve cryptography. In Rust, 
+you can use the age crate (a modern alternative to PGP) or 
+XChaCha20-Poly1305 authenticated encryption via the crypto or orion crates.
+
+
+[dependencies]
+leptos = { version = "0.6" }
+wasm-bindgen = "0.2"
+
+[dependencies.web_sys]
+version = "0.3"
+features = [
+  "Navigator",
+  "MediaDevices",
+  "MediaStream",
+  "MediaStreamTrack",
+  "RtcPeerConnection",
+  "RtcConfiguration",
+  "RtcSessionDescriptionInit",
+  "RtcIceCandidateInit",
+  "HtmlAudioElement"
+]
+
+use leptos::*;
+use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::Closure;
+use web_sys::{HtmlAudioElement, MediaStream, RtcConfiguration, RtcPeerConnection};
+
+#[component]
+pub fn VoiceCall() -> impl IntoView {
+    let start_call = create_action(|_| async move {
+        let window = web_sys::window().unwrap();
+        let navigator = window.navigator();
+        let media_devices = navigator.media_devices().unwrap();
+
+        // 1. Request microphone permission from user
+        let mut constraints = web_sys::MediaStreamConstraints::new();
+        constraints.audio(&wasm_bindgen::JsValue::from_bool(true));
+        
+        let stream_promise = media_devices.get_user_media_with_constraints(&constraints).unwrap();
+        let local_stream: MediaStream = wasm_bindgen_futures::JsFuture::from(stream_promise)
+            .await
+            .unwrap()
+            .unchecked_into();
+
+        // 2. Configure STUN servers (Google offers free public STUN servers for testing)
+        let mut config = RtcConfiguration::new();
+        let ice_servers = js_sys::Array::new();
+        let server = js_sys::Object::new();
+        js_sys::Reflect::set(&server, &"urls".into(), &"stun:://google.com".into()).unwrap();
+        ice_servers.push(&server);
+        config.ice_servers(&ice_servers);
+
+        // 3. Create WebRTC Peer Connection
+        let peer_connection = RtcPeerConnection::new_with_configuration(&config).unwrap();
+
+        // 4. Add our local microphone tracks to the WebRTC connection
+        for track in local_stream.get_tracks().iter() {
+            let track: web_sys::MediaStreamTrack = track.unchecked_into();
+            peer_connection.add_track_0(&track, &local_stream);
+        }
+
+        // 5. Listen for incoming remote audio tracks from the other person
+        let ontrack_closure = Closure::wrap(Box::new(move |event: web_sys::RtcTrackEvent| {
+            let streams = event.streams();
+            if streams.length() > 0 {
+                let remote_stream: MediaStream = streams.get(0).unchecked_into();
+                
+                // Play the other user's voice out loud
+                let audio_element = HtmlAudioElement::new_with_src(&"").unwrap();
+                audio_element.set_src_object(Some(&remote_stream));
+                let _ = audio_element.play().unwrap();
+            }
+        }) as Box<dyn FnMut(web_sys::RtcTrackEvent)>);
+        
+        peer_connection.set_ontrack(Some(ontrack_closure.as_ref().unchecked_ref()));
+        ontrack_closure.forget(); // Keep the closure alive in memory for the call duration
+
+        // Next steps: 
+        // Create an SDP offer using peer_connection.create_offer()
+        // and stringify it to send over your WebSocket signaling layer.
+    });
+
+    view! {
+        <div class="p-4 flex flex-col items-center">
+            <button 
+                class="bg-green-600 text-white px-4 py-2 rounded shadow"
+                on:click=move |_| start_call.dispatch(())>
+                "Start Encrypted Voice Call"
+            </button>
+        </div>
+    }
+}

@@ -19,8 +19,11 @@ pub fn RegisterComponent() -> impl IntoView {
 
         let navigate = navigate.clone();
         let name_val = name.get();
-        let phone_val = phone_number.get();
         let pass_val = password.get();
+        let phone_val = phone_number.get()
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>();
         
         spawn_local(async move {
             let client = reqwest::Client::new();

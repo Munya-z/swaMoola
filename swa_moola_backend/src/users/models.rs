@@ -8,6 +8,7 @@ pub struct AuthenticatedUser {
     pub name: Option<String>,
     pub trust_score: Option<i32>,
     pub active_transactions: Option<i32>,
+    pub discoverable_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)] 
@@ -18,6 +19,7 @@ pub struct User {
     pub password_hash: String,
     pub trust_score: Option<i32>,
     pub active_transactions: Option<i32>,
+    pub discoverable_key: String,
 }
 
 #[derive(Serialize, sqlx::FromRow)] // Added FromRow so SQLx can map to it
@@ -26,6 +28,7 @@ pub struct UserResponse {
     pub name: String,
     pub trust_score: i32,
     pub active_transactions: i32,
+    pub discoverable_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)] 

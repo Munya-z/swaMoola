@@ -2,6 +2,7 @@ use axum::{routing::{post, get}, Router};
 use sqlx::{PgPool};
 
 pub mod handlers;
+pub mod ws;
 pub mod models;
 pub mod services;
 use crate::chats::{services::{get_conversation_messages, get_user_conversations,get_conversation_participants, add_new_participant_in_conversation}, handlers::{send_message, get_conversation_header, make_a_group_conversation}};
