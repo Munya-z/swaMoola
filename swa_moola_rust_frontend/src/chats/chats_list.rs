@@ -199,7 +199,7 @@ pub fn ChatsList() -> impl IntoView {
                                 <li on:click={
                                         
                                         move |_| {
-                                            let target_url = format!("/chats/new/{}", target_id);
+                                            let target_url = format!("/chats/c/{}", target_id);
                                             navigate(&target_url, Default::default());
                                         }
                                     }
@@ -211,9 +211,7 @@ pub fn ChatsList() -> impl IntoView {
                 } 
             } 
         </Suspense>
-    </div>
-
-
+    
         <Suspense fallback=|| view! { <p>"Loading chats..."</p> }> 
             {move || { 
                 chats_resource.get().map(|data: Option<Vec<ConversationPayload>>| { 
@@ -232,5 +230,6 @@ pub fn ChatsList() -> impl IntoView {
                 }) 
             }} 
         </Suspense> 
+    </div>
     } 
 }

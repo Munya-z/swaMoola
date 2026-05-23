@@ -6,11 +6,14 @@ use reqwest::Method;
 use leptos::ev;
 use uuid::Uuid;
 use crate::auth::models::AuthenticatedUser; 
-use crate::chats::models::{ MessagePayload};
+use crate::chats::models::{ MessagePayload, Message};
+
 
 #[component]
-pub fn ChatBox(recipient_id: Uuid,
-#[prop(into)] on_success: Callback<()>
+pub fn ChatBox(
+    recipient_id: Uuid,
+    is_recipient: bool,
+    #[prop(into)] on_success: Callback<()>
 ) -> impl IntoView { 
     let navigate = use_navigate(); 
     let user = window() 
@@ -51,8 +54,24 @@ pub fn ChatBox(recipient_id: Uuid,
             match res { 
                 Ok(resp) => {
                     if resp.status().is_success() {
-                        // Clear the input field on successful transmission
                         set_content.set(String::new());
+
+                        if is_recipient {
+                            // 1. Read raw response text from your backend response
+                            let text = resp.text().await.unwrap_or_default();
+                            
+                            // 2. Parse the text to obtain the conversation UUID
+                            if let Ok(data) = serde_json::from_str::<Message>(&text) {
+                                // 3. Programmatically redirect the user to the ongoing conversation layout
+                                let next_url = format!("/chats/{}", data.conv_id);
+                                request_animation_frame(move || {
+                                    navigate(&next_url, Default::default());
+                                });
+                                
+                            } else {
+                                // Fallback loop notification if serialization keys don't align perfectly
+                                on_success.run(());
+                            }}
                          on_success.run(());
                     } else {
                         set_error_msg.set(Some(format!("Server returned: {}", resp.status())));

@@ -1,6 +1,7 @@
 use leptos::prelude::*; 
 use leptos_router::hooks::use_params;
-use leptos_router::hooks::use_navigate;
+use leptos_router::hooks::{use_navigate};
+use leptos_router::hooks::use_location;
 use leptos::serde_json; 
 use reqwest::Method; 
 use crate::auth::models::AuthenticatedUser; 
@@ -31,6 +32,8 @@ fn format_chat_time(dt: &DateTime<Utc>) -> String {
 #[component]
 pub fn OpenChat() -> impl IntoView {
     let navigate = use_navigate();
+    let location = use_location(); 
+
     let user = window() 
         .local_storage() 
         .ok()
@@ -51,6 +54,12 @@ pub fn OpenChat() -> impl IntoView {
         })
     };
 
+    let is_recipient_route = move || {
+        location.pathname.with(|path| path.contains("/chats/c/"))
+    };
+
+    let (_resolved_conv_id, set_resolved_conv_id) = signal::<Option<Uuid>>(None);
+
     let message_list_ref = NodeRef::<Ul>::new();
     let refresh_trigger = Trigger::new();
     let (message_trigger_read, message_trigger_write) = signal(0);
@@ -70,22 +79,26 @@ pub fn OpenChat() -> impl IntoView {
         let navigate = navigate_for_name_resource.clone();
         let user_uuid = user_uuid.clone();
         let current_id_str = chat_id();
+        let is_recipient = is_recipient_route();
 
         async move { 
             
-            if current_id_str == "No ID found" {
+            if is_recipient || current_id_str == "No ID found" {
                         return None ;
                     }
 
+            let route_id = Uuid::parse_str(&current_id_str).unwrap_or_else(|_| Uuid::nil());
+            
+            set_resolved_conv_id.set(Some(route_id));
 
-            let conv_id = Uuid::parse_str(&current_id_str).unwrap_or_else(|_| Uuid::nil());
+            
             let url = format!("http://localhost:8000/api/m/ch/{}", user_uuid); 
             
-            let payload = ChatPayload { conv_id }; 
+            let payload = ChatPayload { conv_id: route_id }; 
 
             let res: Result<reqwest::Response, reqwest::Error> = 
                 authenticated_fetch(Method::POST, &url, navigate.clone(), Some(payload)).await; 
-            
+        
             match res { 
                 Ok(resp) => {
                     let status = resp.status();
@@ -97,7 +110,7 @@ pub fn OpenChat() -> impl IntoView {
                     }
                 }, 
                 Err(_) => None, 
-            } 
+            }
         }
     });
     
@@ -106,11 +119,12 @@ pub fn OpenChat() -> impl IntoView {
         let user_uuid = user_uuid_clone.clone();
         refresh_trigger.track();
         message_trigger_read.track();
+        let is_recipient = is_recipient_route();
         
         let current_id_str = chat_id(); 
         
         async move { 
-            if current_id_str == "No ID found" {
+            if is_recipient ||current_id_str == "No ID found" {
                 return None ;
             }
 
@@ -155,7 +169,7 @@ pub fn OpenChat() -> impl IntoView {
         <div class="fixed inset-0 top-16 flex bg-[#f0f2f5] font-sans">
             
             // Left Chat Sidebar panel 
-            <div class="hidden md:flex md:w-[350px] border-r border-[#e9edef] bg-white h-full overflow-y-auto">
+            <div class="hidden sm:flex sm:w-[350px] border-r border-[#e9edef] bg-white h-full overflow-y-auto">
                 <ChatsList />
             </div>
 
@@ -172,13 +186,13 @@ pub fn OpenChat() -> impl IntoView {
                     }.into_any(),
 
             _ => view! {
-                <div class="flex-1 flex flex-col h-full relative bg-[url(/images/chat_bg.png)] bg-center">
+                <div class="flex-1 flex flex-col h-full relative bg-[url(/images/chat_bg.png)] bg-center bg-black/35 bg-blend-darken">
                 
                 // Header (Top Chat Info Bar)
 
-                <nav class="h-15 bg-[#f0f2f5] px-4 py-2 flex items-center justify-between border-b border-[#e9edef] z-50 shrink-0">
+                <nav class="h-15 bg-[#ffffff] px-4 py-2 flex items-center justify-between border-b border-[#e9edef] z-50 shrink-0">
                     <div class="flex items-center gap-3.5 min-w-0">
-                        <div class="w-10 h-10 rounded-full bg-[#dfe5e7] flex items-center justify-center text-[#54656f] font-bold shrink-0">
+                        <div class="w-10 h-10 rounded-full bg-[#ffffff] flex items-center justify-center text-[#54656f] font-bold shrink-0">
                             "C"
                         </div>
                         <div class="flex flex-col min-w-0">
@@ -190,12 +204,12 @@ pub fn OpenChat() -> impl IntoView {
                                                 let final_name = single_chat.display_name.unwrap_or_else(|| single_chat.name);
                                                 view! { <span class="text-[16px] font-medium text-[#111b21] truncate">{final_name}</span> }.into_any()
                                             },
-                                            None => view! { <span class="text-[16px] text-red-500 font-medium">"Error Loading Contact"</span> }.into_any(),
+                                            None => view! { <span class="text-[16px] text-red-500 font-medium">"new conversation"</span> }.into_any(),
                                         }
                                     })
                                 }}
                             </Suspense>
-                            <span class="text-xs text-[#667781] truncate">"online"</span>
+                            <span class="text-xs text-[#667781] truncate">"was recently active"</span>
                         </div>
                     </div>
 
@@ -252,19 +266,26 @@ pub fn OpenChat() -> impl IntoView {
 
                 // Message Box Input Anchor wrapper placeholder matching your components configuration layout
                 {move || {
-                    let derived_recipient_id = chat_massages.get()
-                        .flatten() 
-                        .and_then(|messages| {
-                            messages.iter()
-                                .find(|msg| msg.sender_id != user_uuid_opt)
-                                .and_then(|msg| msg.sender_id) 
-                        })
-                        .unwrap_or_else(Uuid::nil);
-                    
+                    let id_str = chat_id();
+                    let route_uuid = Uuid::parse_str(&id_str).unwrap_or_else(|_| Uuid::nil());
+
+                    let derived_recipient_id = if is_recipient_route() {
+                            route_uuid
+                        } else {
+                        chat_massages.get()
+                            .flatten() 
+                            .and_then(|messages| {
+                                messages.iter()
+                                    .find(|msg| msg.sender_id != user_uuid_opt) 
+                                    .and_then(|msg| msg.sender_id)
+                            })
+                            .unwrap_or_else(Uuid::nil)
+                        };
 
                     view! { 
                         <ChatBox 
                             recipient_id=derived_recipient_id 
+                            is_recipient=is_recipient_route()
                             on_success=move || refresh_trigger.notify()
                         /> 
                     }

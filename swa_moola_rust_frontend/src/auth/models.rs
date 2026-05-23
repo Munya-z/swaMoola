@@ -14,6 +14,7 @@ pub struct AuthenticatedUser {
     pub name: Option<String>,
     pub trust_score: Option<i32>,
     pub active_transactions: Option<i32>,
+     pub discoverable_key: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

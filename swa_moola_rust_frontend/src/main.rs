@@ -56,6 +56,7 @@ pub fn App() -> impl IntoView {
                     <Route path=path!("/chats/c") view=OpenChat/>
                     // Dynamic parameter example
                     <Route path=path!("/chats/:id") view=OpenChat/>
+                    <Route path=path!("/chats/c/:id") view=OpenChat/>
                 </Routes>
             </main>
         </Router>
