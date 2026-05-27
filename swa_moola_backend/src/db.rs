@@ -11,7 +11,6 @@ pub async fn begin_rls_txn(
     let mut tx = pool.begin().await?;
 
     // Set the RLS variable inside this specific transaction
-    // 'app.current_user_id' must match what you wrote in your SQL Policy
     sqlx::query("SELECT set_config('app.current_user_id', $1, true)")
         .bind(user_id.to_string())
         .execute(&mut *tx)

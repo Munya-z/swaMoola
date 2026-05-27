@@ -1,7 +1,6 @@
 use leptos_router::{components::*, hooks::use_navigate};
-use leptos::{prelude::*,task::spawn_local, ev, serde_json};
+use leptos::{prelude::*, ev};
 use crate::auth_state::AuthState;
-use crate::auth::models::{ LoginResponse, LoginCredentials };
 
 
 #[component]
@@ -17,50 +16,15 @@ pub fn LoginComponent() -> impl IntoView {
     
     let on_submit = move |ev: ev::SubmitEvent| {
         ev.prevent_default();
-        set_error_msg.set(None);
 
-        let navigate = navigate.clone(); 
-        let phone_val = phone_number.get()
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect::<String>();
-        let pass_val = password.get();
-        
-        spawn_local(async move {
-            let client = reqwest::Client::new();
-            let res : Result<reqwest::Response, reqwest::Error> = client
-                .post("http://localhost:8000/users/login") 
-                .json(&LoginCredentials { phone_number: phone_val, password: pass_val })
-                .send()
-                .await;
-
-            match res {
-                Ok(response) if response.status().is_success() => {
-                    let data : LoginResponse = response.json::<LoginResponse>().await.unwrap();
-                    let storage = window().local_storage().unwrap().unwrap();
-
-                    let _ = storage.set_item("auth_token", &data.token);
-                    let user_json = serde_json::to_string(&data.user).unwrap();
-                    let _ = storage.set_item("auth_user", &user_json);
-
-                    log::info!("Login successful!");
-                    auth.update(|state| state.token = Some(data.token));
-
-                    navigate("/", Default::default());
-                }
-                Ok(response) => {
-                    let msg = format!("Login failed with status: {}", response.status());
-                    log::error!("{}", msg);
-                    set_error_msg.set(Some(msg));
-                }
-                Err(e) => {
-                    let msg = format!("Network error: {}", e);
-                    log::error!("{}", msg);
-                    set_error_msg.set(Some(msg));
-                    
-                }
-            }
-        });
+        super::login_handlers::login_handler(
+            phone_number,
+            password,
+            set_error_msg,
+            auth,
+            navigate.clone(),
+        );
+      
     };
 
     view! {

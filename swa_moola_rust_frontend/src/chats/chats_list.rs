@@ -101,7 +101,10 @@ fn ChatItem(chat: ConversationPayload, user_uuid: String) -> impl IntoView {
     }
 }
 
-pub fn ChatsList() -> impl IntoView { 
+#[component]
+pub fn ChatsList( 
+    
+) -> impl IntoView { 
     let navigate = use_navigate(); 
     let user = window() 
         .local_storage() 

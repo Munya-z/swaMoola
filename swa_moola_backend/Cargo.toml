@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = { version = "0.8", features = ["macros", "ws"] }
+axum = { version = "0.8", features = ["macros", "ws", "multipart"] }
 anyhow = "1.0"
 futures-util = "0.3" 
 tokio = { version = "1.52.3", features = ["full"] }

@@ -9,8 +9,8 @@ mod auth_state;
 mod chats;
 
 use chats::{chats_list::ChatsList, open_chat::OpenChat};
-use auth::login::LoginComponent;
-use auth::register::RegisterComponent;
+use auth::login_ui::LoginComponent;
+use auth::register_ui::RegisterComponent;
 use main_page::home::Home;
 use auth_state::AuthState; 
 

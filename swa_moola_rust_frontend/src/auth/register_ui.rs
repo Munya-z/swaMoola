@@ -15,42 +15,13 @@ pub fn RegisterComponent() -> impl IntoView {
 
     let on_submit = move |ev: ev::SubmitEvent| {
         ev.prevent_default();
-        set_error_msg.set(None);
-
-        let navigate = navigate.clone();
-        let name_val = name.get();
-        let pass_val = password.get();
-        let phone_val = phone_number.get()
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect::<String>();
-        
-        spawn_local(async move {
-            let client = reqwest::Client::new();
-            let res = client
-                .post("http://localhost:8000/users/register") 
-                .json(&RegisterCredentials { name: &name_val, phone_number: &phone_val, password: &pass_val })
-                .send()
-                .await;
-
-            match res {
-                Ok(response) if response.status().is_success() => {
-                    log::info!("Registering successful!");
-                    navigate("/login", Default::default());
-                }
-                Ok(response) => {
-                    let msg = format!("Registering failed with status: {}", response.status());
-                    log::error!("{}", msg);
-                    set_error_msg.set(Some(msg));
-                }
-                Err(e) => {
-                    let msg = format!("Network error: {}", e);
-                    log::error!("{}", msg);
-                    set_error_msg.set(Some(msg));
-                    
-                }
-            }
-        });
+        super::register_handlers::register_handler(
+            name,
+            phone_number,
+            password,
+            set_error_msg,
+            navigate.clone(),
+        );
     };
 
     view! {

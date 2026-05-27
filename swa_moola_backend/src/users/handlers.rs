@@ -3,14 +3,14 @@ use sqlx::{PgPool};
 use uuid::Uuid;
 use sha2::{Sha256, Digest};
 use std::{env};
-use serde::{Serialize, Deserialize};
 use jsonwebtoken::{encode, Header, EncodingKey};
 use chrono::{Utc, Duration};
 use rand::Rng;
 use argon2::{password_hash::{rand_core::OsRng, PasswordHasher, SaltString},Argon2, PasswordHash, PasswordVerifier};
 
-use crate::users::models::{AuthResponse, AuthenticatedUser, LoginRequest, RegisterRequest, User, UserResponse};
+use crate::users::models::{AuthResponse, AuthenticatedUser, LoginRequest, RegisterRequest, User, UserResponse, DiscoverableSearchRequest , DiscoverableSearchResponse};
 
+// Create a user into the database, hashing the password and phone number appropriately
 async fn create_user(
     pool: &PgPool,
     name: String,
@@ -59,6 +59,7 @@ async fn create_user(
     Ok(new_user)
 }
 
+// Handler for user registration endpoint
 pub async fn register_user(
     State(pool): State<PgPool>,
     Json(payload): Json<RegisterRequest>,
@@ -73,6 +74,7 @@ pub async fn register_user(
     Ok((StatusCode::CREATED, Json(user)))
 }
 
+//verify if the user has a account and if the password is correct upon login attempt
 pub async fn verify_user(
     pool: &PgPool,
     phone_number: &str,
@@ -109,6 +111,7 @@ pub async fn verify_user(
     })
 }
 
+// generate JWT token for authenticated user
 pub fn generate_token(user: &AuthenticatedUser, secret: &str) -> anyhow::Result<String> {
     let expiration = Utc::now()
         .checked_add_signed(Duration::hours(24))
@@ -130,6 +133,7 @@ pub fn generate_token(user: &AuthenticatedUser, secret: &str) -> anyhow::Result<
     Ok(token)
 }
 
+// handles login requests, verifying credentials and returning a JWT token and user data if successful
 pub async fn login_handler(
     State(pool): State<PgPool>,
     Json(payload): Json<LoginRequest>, 
@@ -150,21 +154,11 @@ pub async fn login_handler(
     Ok(Json(AuthResponse { token, user }))
 }
 
-#[derive(Deserialize)]
-pub struct SearchRequest {
-    pub key: String,
-}
-
-#[derive(Serialize)]
-pub struct SearchResponse {
-    pub target_user_id: Uuid,
-    pub name: String,
-}
-
+//  allows users to search fot others by their discoverable key, returning minimal info needed to request a connection if found
 pub async fn search_by_discoverable_key(
     State(pool): State<PgPool>,
-    Json(payload): Json<SearchRequest>,
-) -> Result<Json<SearchResponse>, (StatusCode, String)> {
+    Json(payload): Json<DiscoverableSearchRequest>,
+) -> Result<Json<DiscoverableSearchResponse>, (StatusCode, String)> {
     // Enforce strict 12-character validation right away to prevent database spamming
     if payload.key.len() != 12 {
         return Err((StatusCode::BAD_REQUEST, "Invalid key format".to_string()));
@@ -180,23 +174,21 @@ pub async fn search_by_discoverable_key(
 
     match result {
         Ok(Some(user)) => {
-            // Found! Return ONLY the minimal details needed to request a connection
-            Ok(Json(SearchResponse {
+            Ok(Json(DiscoverableSearchResponse {
                 target_user_id: user.id,
                 name: user.name,
             }))
         }
         Ok(None) => {
-            // Keep error messages generic so attackers can't guess profiles
             Err((StatusCode::NOT_FOUND, "No user found with that key".to_string()))
         }
-        Err(e) => {
-            eprintln!("Database lookup failure: {e}");
+        Err(_) => {
             Err((StatusCode::INTERNAL_SERVER_ERROR, "Search failed".to_string()))
         }
     }
 }
 
+// generates a new, random 12-character discoverable key using a custom alphabet that avoids easily confused characters, ensuring uniqueness and user-friendliness.
 pub fn generate_discoverable_key() -> String {
     // A customized alphabet that removes 0, O, 1, I, and l to completely avoid typos
     const ALLOWED_CHARS: &[u8] = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -213,6 +205,7 @@ pub fn generate_discoverable_key() -> String {
     key
 }
 
+// used to refresh a user's discoverable key, generating a new one and saving it to the database
 pub async fn refresh_user_key(
     State(pool): State<PgPool>,
     Path(user_id): Path<Uuid>,
@@ -231,8 +224,7 @@ pub async fn refresh_user_key(
 
     match update_result {
         Ok(_) => (StatusCode::OK, new_key),
-        Err(e) => {
-            eprintln!("Failed to save new discoverable key: {e}");
+        Err(_) => {
             (StatusCode::INTERNAL_SERVER_ERROR, "Failed to generate key".to_string())
         }
     }

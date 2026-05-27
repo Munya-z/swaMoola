@@ -49,3 +49,14 @@ pub struct AuthResponse {
     pub token: String,
     pub user: AuthenticatedUser, 
 }
+
+#[derive(Deserialize)]
+pub struct DiscoverableSearchRequest {
+    pub key: String,
+}
+
+#[derive(Serialize)]
+pub struct DiscoverableSearchResponse {
+    pub target_user_id: Uuid,
+    pub name: String,
+}

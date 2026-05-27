@@ -1,8 +1,8 @@
 use std::env;
 use sqlx::{postgres::{PgPoolOptions, PgPool} };
 use axum::{middleware as axum_middleware};
-use axum::{http::{HeaderValue, Method}, Router,routing::get};
-use tower_http::cors::{Any, CorsLayer};
+use axum::{http::{Method}, Router,routing::get};
+use tower_http::cors::{CorsLayer};
 use axum::http::header::{AUTHORIZATION, CONTENT_TYPE, UPGRADE, CONNECTION};
 use crate::chats::ws::ws_handler;
 
