@@ -1,3 +1,4 @@
 /target
 .env
 /uploads
+/local_cloud_storage
