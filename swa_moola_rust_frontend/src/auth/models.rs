@@ -6,6 +6,8 @@ pub struct RegisterCredentials<'a>{
     pub name: &'a str,
     pub phone_number: &'a str,
     pub password: &'a str,  
+    pub x_public: &'a str,
+    pub pq_public: &'a str,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,7 +16,9 @@ pub struct AuthenticatedUser {
     pub name: Option<String>,
     pub trust_score: Option<i32>,
     pub active_transactions: Option<i32>,
-     pub discoverable_key: Option<String>,
+    pub discoverable_key: Option<String>,
+    pub x_public: Option<String>,
+    pub pq_public: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -28,4 +32,6 @@ pub struct LoginCredentials {
     pub phone_number: String,
     pub password: String,
 }
+
+
 

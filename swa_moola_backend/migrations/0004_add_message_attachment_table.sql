@@ -1,10 +1,10 @@
-ALTER TABLE messages ALTER COLUMN content DROP NOT NULL;
+
 
 CREATE TABLE message_attachments (
     attachment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     msg_id UUID NOT NULL REFERENCES messages(msg_id) ON DELETE CASCADE,
     file_name TEXT NOT NULL,
-    file_data BYTEA NOT NULL,       
+    storage_url TEXT NOT NULL,       
     file_type TEXT NOT NULL,       
     file_size INT NOT NULL,        
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

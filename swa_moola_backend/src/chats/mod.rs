@@ -16,4 +16,5 @@ pub fn routes()->Router<PgPool>{
         .route("/participants/{id}", get(get_conversation_participants))
         .route("/ch/{id}", post(get_conversation_header))
         .route("/attachments/{id}", get(download_attachment))
+        .layer(axum::extract::DefaultBodyLimit::max(70 * 1024 * 1024))
 }

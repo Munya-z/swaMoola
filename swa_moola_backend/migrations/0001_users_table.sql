@@ -5,9 +5,15 @@ CREATE TABLE users (
     password_hash TEXT NOT NULL,
     trust_score INTEGER DEFAULT 0,
     active_transactions INTEGER DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    x_public TEXT NOT NULL,
+    pq_public TEXT NOT NULL,
+    discoverable_key VARCHAR(12) UNIQUE DEFAULT NULL
 );
 
+
+
+CREATE INDEX idx_users_discoverable_key ON users(discoverable_key);
 -- This ensures users can only see their own profile.
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 

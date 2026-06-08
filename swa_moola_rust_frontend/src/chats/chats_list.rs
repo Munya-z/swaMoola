@@ -4,12 +4,13 @@ use crate::interceptor::authenticated_fetch;
 use leptos_router::hooks::use_navigate; 
 use leptos::serde_json; 
 use reqwest::Method;  
+// use web_sys::window;
 use uuid::Uuid;
 use crate::auth::models::AuthenticatedUser; 
 use crate::chats::models::{ConversationPayload, ChatPayload, SearchPayload, SearchResult};
 use chrono::{DateTime, Utc, Datelike};
 
-fn format_chat_time(dt: &DateTime<Utc>) -> String {
+fn _format_chat_time(dt: &DateTime<Utc>) -> String {
     let local_time = dt.with_timezone(&chrono::Local);
     let today = chrono::Local::now();
 
@@ -80,10 +81,10 @@ fn ChatItem(chat: ConversationPayload, user_uuid: String) -> impl IntoView {
                                         <div class="flex-1 min-w-0 border-b border-[#f0f2f5] pb-2.5">
                                         <div class="flex justify-between items-baseline mb-1">
                                             <h3 class="text-[16px] font-medium text-[#111b21] truncate">{single_chat.display_name}</h3>
-                                            <span class="text-xs text-[#00a884] font-medium whitespace-nowrap ml-1.5">{format_chat_time(&single_chat.last_msg_date.unwrap_or_else(chrono::Utc::now))}</span>
+                                            // <span class="text-xs text-[#00a884] font-medium whitespace-nowrap ml-1.5">{format_chat_time(&single_chat.last_msg_date.unwrap_or_else(chrono::Utc::now))}</span>
                                         </div>
                                         <div class="flex justify-between items-center">
-                                            <p class="text-sm text-[#667781] truncate flex-1">{single_chat.last_msg_content.as_deref().unwrap_or_else(|| "No messages yet")}</p>
+                                            // <p class="text-sm text-[#667781] truncate flex-1">{single_chat.last_msg_content.as_deref().unwrap_or_else(|| "No messages yet")}</p>
                                             <span class="bg-[#00a884] text-white text-xs font-semibold min-w-[20px] h-5 rounded-full flex items-center justify-center px-1 ml-2">""</span>
                                         </div>
                                         </div>
@@ -197,6 +198,7 @@ pub fn ChatsList(
                 search_result.get().map(|data: SearchResult| { 
                     let navigate = value_for_search.clone();
                     let target_id = data.target_user_id.clone(); 
+                    _=save_search_result(&data);
                     view! { 
                             <ul  class=" px-4 mt-4 w-full bg-white font-sans "> 
                                 <li on:click={
@@ -236,3 +238,24 @@ pub fn ChatsList(
     </div>
     } 
 }
+
+
+pub fn save_search_result(result: &SearchResult) -> Result<(), wasm_bindgen::JsValue> {
+
+    // Get session storage
+    let storage = web_sys::window()
+        .and_then(|w| w.session_storage().ok())
+        .flatten()
+        .ok_or_else(|| wasm_bindgen::JsValue::from_str("Session storage is not available"))?; 
+    
+    
+    // Turn the struct into a JSON string
+    let json_string = serde_json::to_string(result)
+        .map_err(|e| wasm_bindgen::JsValue::from_str(&e.to_string()))?;
+    
+    // Save it with the key "search_result"
+    storage.set_item("search_result", &json_string)?;
+    
+    Ok(())
+}
+

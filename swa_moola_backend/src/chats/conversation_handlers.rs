@@ -166,13 +166,15 @@ pub async fn get_conversation_header(
 
     let convo_result = sqlx::query_as!(
         ConversationResult,
-        r#"
-            SELECT 
+            r#"
+                SELECT 
                 c.conv_id as "conv_id!", 
                 c.is_group as "is_group!", 
                 c.created_at as "created_at!",
+                c.last_message_id as "last_message_id?",
                 COALESCE(c.name, 'Untitled') as "name!",
-                -- Subquery to dynamically set the display name based on participant or group name
+                
+                -- Subquery to dynamically set the display name securely
                 COALESCE(CASE 
                     WHEN c.is_group = TRUE THEN COALESCE(c.name, 'Untitled Group')
                     ELSE (
@@ -183,10 +185,8 @@ pub async fn get_conversation_header(
                         LIMIT 1
                     )
                 END, 'Untitled')::text AS "display_name!",
-                m.content AS "last_msg_content?",
-                m.created_at AS "last_msg_date?",
-                m.sender_id AS "last_msg_sender?",
 
+                -- Subquery to get recipient metadata safely without duplicating rows
                 (CASE 
                     WHEN c.is_group = FALSE THEN (
                         SELECT cp_other.user_id 
@@ -195,14 +195,34 @@ pub async fn get_conversation_header(
                         LIMIT 1
                     )
                     ELSE NULL
-                END) as "recipient_id?"
+                END) as "recipient_id?",
+
+                (CASE 
+                    WHEN c.is_group = FALSE THEN (
+                        SELECT u_other.pq_public 
+                        FROM conversation_participants cp_other
+                        JOIN users u_other ON u_other.id = cp_other.user_id
+                        WHERE cp_other.conv_id = c.conv_id AND cp_other.user_id != $2
+                        LIMIT 1
+                    )
+                    ELSE NULL
+                END) as "pq_public?",
+
+                (CASE 
+                    WHEN c.is_group = FALSE THEN (
+                        SELECT u_other.x_public 
+                        FROM conversation_participants cp_other
+                        JOIN users u_other ON u_other.id = cp_other.user_id
+                        WHERE cp_other.conv_id = c.conv_id AND cp_other.user_id != $2
+                        LIMIT 1
+                    )
+                    ELSE NULL
+                END) as "x_public?"
 
             FROM conversations c
             JOIN conversation_participants cp ON c.conv_id = cp.conv_id
-            LEFT JOIN messages m ON c.last_message_id = m.msg_id
             WHERE c.conv_id = $1 AND cp.user_id = $2
-            ORDER BY m.created_at DESC NULLS LAST;
-
+            ORDER BY c.created_at DESC;
         "#,
         payload.conv_id,
         user_id

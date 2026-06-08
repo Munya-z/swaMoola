@@ -64,7 +64,7 @@ pub fn App() -> impl IntoView {
 }
 
 fn main() {
-
+    wasm_logger::init(wasm_logger::Config::default());
     leptos::mount::mount_to_body(App);
 }
 

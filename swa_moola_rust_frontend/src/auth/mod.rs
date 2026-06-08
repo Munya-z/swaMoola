@@ -3,3 +3,4 @@ pub mod login_ui;
 pub mod register_handlers;
 pub mod register_ui;
 pub mod models;
+pub mod create_ecryption_keys;

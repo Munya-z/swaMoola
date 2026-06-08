@@ -1,8 +1,9 @@
 use uuid::Uuid;
 use sqlx::PgPool;
 use axum::{extract::{State,Path}, Json, http::{StatusCode, header, HeaderMap}};
-use crate::chats::models::{Conversation, ConversationParticipant, Message, ConversationIdPayload, AttachmentMetadata };
-use axum::response::IntoResponse;
+use axum::{body::Body,response::IntoResponse};
+use tokio_util::io::ReaderStream;
+use crate::chats::models::{Conversation, ConversationParticipant, MessageReturn, ConversationIdPayload, DbEnvelope};
 use crate::db::begin_rls_txn;
 
 
@@ -12,38 +13,28 @@ pub async fn get_conversation_messages(
     State(pool): State<PgPool>, 
     Path(user_id): Path<Uuid>,
     Json(payload): Json<ConversationIdPayload>
-)-> Result<Json<Vec<Message>>, StatusCode>{
+)-> Result<Json<Vec<MessageReturn>>, StatusCode>{
     let mut tx =begin_rls_txn(&pool, user_id).await.map_err(|_|
     StatusCode::INTERNAL_SERVER_ERROR)?;
     
     let query = sqlx::query_as!(
-        Message,r#"
+        MessageReturn, r#"
         SELECT 
             m.msg_id as "msg_id!", 
-            m.conv_id as "conv_id!", 
-            m.sender_id as "sender_id?", 
-            m.content as "content?", 
+            m.conv_id as "conv_id!",   
             m.created_at as "created_at!",
-            COALESCE(
-                json_agg(
-                    json_build_object(
-                        'attachment_id', a.attachment_id,
-                        'file_name', a.file_name,
-                        'file_size', a.file_size,
-                        'file_type', a.file_type
-                    )
-                ) FILTER (WHERE a.attachment_id IS NOT NULL),
-                '[]'
-            ) as "attachments!: _"
+            m.ciphertext as "ciphertext!",
+            m.nonce as "nonce!",
+            m.s_envelope as "s_envelope!: sqlx::types::Json<DbEnvelope>",
+            m.r_envelope as "r_envelope!: sqlx::types::Json<DbEnvelope>"
         FROM messages m
-        LEFT JOIN message_attachments a ON m.msg_id = a.msg_id
         WHERE m.conv_id = $1
-        GROUP BY m.msg_id
         ORDER BY m.created_at ASC
         "#,
         payload.conv_id,
     );
-    let messages = query.fetch_all(&mut *tx) 
+
+    let messages: Vec<MessageReturn> = query.fetch_all(&mut *tx) 
     .await.map_err(|e: sqlx::Error| {
         println!("Database query error: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
@@ -81,7 +72,7 @@ pub async fn get_user_conversations(
         "#,
         user_id,
     );
-    let conversations = query.fetch_all(&mut *tx) 
+    let conversations: Vec<Conversation> = query.fetch_all(&mut *tx) 
     .await.map_err(|e: sqlx::Error| {
         println!("Database query error: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
@@ -114,7 +105,7 @@ pub async fn get_conversation_participants(
         "#,
         payload.conv_id,
     );
-    let participants = query.fetch_all(&mut *tx) 
+    let participants: Vec<ConversationParticipant> = query.fetch_all(&mut *tx) 
     .await.map_err(|e: sqlx::Error| {
         println!("Database query error: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
@@ -134,7 +125,7 @@ pub async fn download_attachment(
 ) -> impl IntoResponse {
    
     let record = sqlx::query!(
-        "SELECT file_name, file_data, file_type FROM message_attachments WHERE attachment_id = $1",
+        "SELECT file_name, storage_url, file_type FROM message_attachments WHERE attachment_id = $1",
         attachment_id
     )
     .fetch_optional(&pool)
@@ -143,19 +134,33 @@ pub async fn download_attachment(
     match record {
         Ok(Some(row)) => {
             
+            let safe_filename = row.file_name.replace("..", "").replace("/", "").replace("\\", "");
+            let file_path = format!("./local_cloud_storage/{}", safe_filename);
+
+            // 2. Try to open the file from disk
+            let file = match tokio::fs::File::open(&file_path).await {
+                Ok(file) => file,
+                Err(_) => return StatusCode::NOT_FOUND.into_response(),
+            };
+
+            // 3. Convert the file into a stream body
+            let stream = ReaderStream::new(file);
+            let body = Body::from_stream(stream);
+
+            // 4. Set the headers
             let mut headers = HeaderMap::new();
             headers.insert(
                 header::CONTENT_DISPOSITION,
                 format!("attachment; filename=\"{}\"", row.file_name).parse().unwrap(),
             );
-            if let Ok(content_type) = row.file_type.parse() {
-                headers.insert(header::CONTENT_TYPE, content_type);
-            } else {
-                headers.insert(header::CONTENT_TYPE, "application/octet-stream".parse().unwrap());
-            }
-
             
-            (StatusCode::OK, headers, row.file_data).into_response()
+            let content_type = row.file_type
+                .parse()
+                .unwrap_or_else(|_| "application/octet-stream".parse().unwrap());
+            headers.insert(header::CONTENT_TYPE, content_type);
+
+            // 5. Return the actual file stream
+            (StatusCode::OK, headers, body).into_response()
         }
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),

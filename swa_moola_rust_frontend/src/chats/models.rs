@@ -4,16 +4,6 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc}; 
 use leptos_router::params::Params;
 
-
-#[derive(Debug, Clone, Serialize, Deserialize)] 
-pub struct Chat { 
-    pub name: String, 
-    pub conv_id: Uuid, 
-    pub is_group: bool, 
-    pub created_at: DateTime<Utc>, 
-    pub display_name : String 
-} 
-
 #[derive(Params, PartialEq, Clone, Debug)]
 pub struct ChatParams {
     pub id: String, 
@@ -26,18 +16,30 @@ pub struct ChatPayload {
 
 #[derive(Serialize, Deserialize, Clone, Debug,  PartialEq)]
 pub struct Attachment {
-    pub attachment_id: uuid::Uuid,
+    // pub attachment_id: uuid::Uuid,
     pub file_name: String,
     pub file_size: i32,
     pub file_type: String,
+    pub storage_url: String,
+    pub file_key: String,
+    pub nonce_base: String,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug,  PartialEq)]
+pub struct AttachmentMeta {
+    pub file_name: String,
+    pub file_size: i32,
+    pub file_type: String,
+    pub storage_url: String,
+    pub file_key: String,
+    pub nonce_base: String,
+}
 
 #[derive(Debug, Clone,Serialize, Deserialize)] 
 pub struct Message {
     pub msg_id: Uuid,
     pub conv_id: Uuid,
-    pub sender_id: Option<Uuid>,
+    pub sender_id: Uuid,
     pub content: Option<String>,
     pub created_at: DateTime<Utc>,
     pub attachments: Vec<Attachment>,
@@ -47,14 +49,8 @@ pub struct Message {
 pub struct SearchResult {
     pub target_user_id: Uuid,
     pub name: String,
-}
-
-
-#[derive(Debug,Clone , Deserialize, Serialize)] 
-pub struct MessagePayload {
-    pub sender_id: Uuid,
-    pub recipient_id: Uuid,
-    pub content: String,
+    pub x_public: String,
+    pub pq_public: String,
 }
 
 #[derive(Debug,Clone , Deserialize, Serialize)] 
@@ -65,12 +61,49 @@ pub struct ConversationPayload {
     pub name: String,
     pub display_name: Option<String>,
     pub recipient_id: Option<Uuid>, 
-    pub last_msg_content: Option<String>,
-    pub last_msg_date: Option<DateTime<Utc>>,
-    pub last_msg_sender: Option<Uuid>,
+    pub x_public: Option<String>,
+    pub pq_public: Option<String>,
+    pub last_msg_id: Option<Uuid>,
+    
 }
 
 #[derive(Debug,Clone , Deserialize, Serialize)] 
 pub struct SearchPayload {
     pub key: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SecretInnerPayload {
+    pub sender_id: Uuid,
+    pub timestamp_ms: DateTime<Utc>, 
+    pub text_message: String,
+    pub attachments: Vec<AttachmentMeta>, 
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OutboundMessagePayload {
+    pub recipient_id: Uuid,
+    pub ciphertext: String,       
+    pub nonce: String,            
+    pub s_envelope: Envelope,
+    pub r_envelope: Envelope,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct InboundMessagePayload {
+    pub msg_id: Uuid,
+    pub conv_id: Uuid,
+    pub ciphertext: String,
+    pub nonce: String,
+    pub s_envelope: Envelope, 
+    pub r_envelope: Envelope,
+    pub created_at: DateTime<Utc>,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Envelope {
+    pub ephemeral_x25519: String, 
+    pub pq_ciphertext: String,
+    pub encrypted_master_key: String,    
 }

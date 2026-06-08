@@ -27,35 +27,37 @@ pub struct ConversationResult {
     pub name: String,
     pub display_name: Option<String>,
     pub recipient_id: Option<Uuid>, 
-    pub last_msg_content: Option<String>,
-    pub last_msg_date: Option<DateTime<Utc>>,
-    pub last_msg_sender: Option<Uuid>,
+    pub pq_public: Option<String>,
+    pub x_public: Option<String>,
+    pub last_message_id : Option<Uuid>,
 }
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct AttachmentMetadata {
-    pub attachment_id: uuid::Uuid,
-    pub file_name: String,
-    pub file_size: i32,
-    pub file_type: String,
-}
-
 
 #[derive(Serialize, Deserialize, sqlx::FromRow, Clone, Debug)] 
 pub struct Message {
     pub msg_id: Uuid,
     pub conv_id: Uuid,
-    pub sender_id: Option<Uuid>,
-    pub content: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub attachments: sqlx::types::Json<Vec<AttachmentMetadata>>, 
+    pub ciphertext: String,
+    pub nonce: String,
+    pub s_envelope: sqlx::types::Json<serde_json::Value>, 
+    pub r_envelope: sqlx::types::Json<serde_json::Value>,
 }
 
-#[derive(Debug,Clone , Deserialize)] 
-pub struct MessagePayload {
-    pub sender_id: Uuid,
-    pub recipient_id: Uuid,
-    pub content: Option<String>,
+#[derive(Serialize, Deserialize, sqlx::FromRow, Clone, Debug)] 
+pub struct MessageReturn {
+    pub msg_id: Uuid,
+    pub conv_id: Uuid,
+    pub ciphertext: String,
+    pub nonce: String,
+    pub s_envelope: sqlx::types::Json<DbEnvelope>,
+    pub r_envelope: sqlx::types::Json<DbEnvelope>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DbEnvelope {
+    pub ephemeral_x25519: String,
+    pub pq_ciphertext: String,
+    pub encrypted_master_key: String, // Forces SQLx to map this column field
 }
 
 #[derive(Debug,Clone , Deserialize)] 

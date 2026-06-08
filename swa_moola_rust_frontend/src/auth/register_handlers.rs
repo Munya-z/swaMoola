@@ -1,6 +1,6 @@
-use leptos::{prelude::*,task::spawn_local, ev};
+use leptos::{prelude::*,task::spawn_local};
 use leptos_router::NavigateOptions;
-
+use crate::auth::create_ecryption_keys::generate_hybrid_identities;
 use crate::auth::models::RegisterCredentials;
 
 
@@ -20,12 +20,13 @@ pub fn register_handler(
     .chars()
     .filter(|c| !c.is_whitespace())
     .collect::<String>();
-    
+    let (x_pub, pq_pub) = generate_hybrid_identities();
+
     spawn_local(async move {
         let client = reqwest::Client::new();
         let res = client
             .post("http://localhost:8000/users/register") 
-            .json(&RegisterCredentials { name: &name_val, phone_number: &phone_val, password: &pass_val })
+            .json(&RegisterCredentials { name: &name_val, phone_number: &phone_val, password: &pass_val , x_public: &x_pub, pq_public: &pq_pub })
             .send()
             .await;
 

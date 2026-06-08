@@ -1,10 +1,183 @@
 here are the fetures i have.
 
 pgp E2EE encryption,
-7 day message deletion,
-True delete( all copies of any message are all deleted),
-text messaging,
+* 7 day message deletion,
+* True delete( all copies of any message are all deleted),
+* text messaging,
 voice messaging,
 voice and video calling,
-seacrh for users by 12 character discoverable keys so no person can guesss your name and randpmly text you,
-all phone numbers used to login are hashed and only the hash is stored in the database
+* eacrh for users by 12 character discoverable keys so no person can guesss your name and randpmly text you,
+* all phone numbers used to login are hashed and only the hash is stored in the database
+
+
+THE VOICE MESSAGING 
+use leptos::*;
+use wasm_bindgen::prelude::*;
+use web_sys::{MediaRecorder, MediaStream, Blob, Url, HtmlAudioElement};
+use js_sys::{Array, Uint8Array};
+
+#[derive(Clone, PartialEq)]
+enum RecordState {
+    Idle,
+    Recording,
+    Finished(String), // Stores the local audio URL for playback
+}
+
+#[component]
+pub fn VoiceRecorder() -> impl IntoView {
+    let state = RwSignal::new(RecordState::Idle);
+    
+    // Store web-sys objects across renders using StoredValue
+    let media_recorder: StoredValue<Option<MediaRecorder>> = StoredValue::new(None);
+    let audio_chunks: StoredValue<Array> = StoredValue::new(Array::new());
+
+    // 1. START RECORDING
+    let start_recording = move |_| {
+        spawn_local(async move {
+            let window = web_sys::window().unwrap();
+            let navigator = window.navigator();
+            let media_devices = navigator.media_devices().unwrap();
+
+            // Request microphone access
+            let constraints = js_sys::Object::new();
+            js_sys::Reflect::set(&constraints, &"audio".into(), &true.into()).unwrap();
+            
+            let stream_promise = media_devices.get_user_media_with_constraints(&constraints).unwrap();
+            let stream_js = wasm_bindgen_futures::JsFuture::from(stream_promise).await.unwrap();
+            let stream: MediaStream = stream_js.unchecked_into();
+
+            // Setup the recorder
+            let recorder = MediaRecorder::new_with_media_stream(&stream).unwrap();
+            
+            // Reset chunks array
+            audio_chunks.set_value(Array::new());
+
+            // Handle incoming audio data blocks
+            let chunks_clone = audio_chunks.clone();
+            let ondataavailable = Closure::wrap(Box::new(move |e: web_sys::MessageEvent| {
+                let blob: Blob = e.data().unchecked_into();
+                chunks_clone.with_value(|arr| { arr.push(&blob); });
+            }) as Box<dyn FnMut(_)>);
+            
+            recorder.set_ondataavailable(Some(ondataavailable.as_ref().unchecked_ref()));
+            ondataavailable.forget(); // Keep closure alive in memory
+
+            // Handle what happens when recording stops
+            let chunks_finish_clone = audio_chunks.clone();
+            let onstop = Closure::wrap(Box::new(move |_e: web_sys::Event| {
+                let final_chunks = chunks_finish_clone.get_value();
+                
+                let options = web_sys::BlobPropertyBag::new();
+                options.set_type("audio/webm"); // Default standard browser audio format
+
+                let blob = Blob::new_with_blob_sequence_and_options(&final_chunks, &options).unwrap();
+                let audio_url = Url::create_object_url_with_blob(&blob).unwrap();
+                
+                state.set(RecordState::Finished(audio_url));
+            }) as Box<dyn FnMut(_)>);
+
+            recorder.set_onstop(Some(onstop.as_ref().unchecked_ref()));
+            onstop.forget();
+
+            // Begin actual recording
+            recorder.start().unwrap();
+            media_recorder.set_value(Some(recorder));
+            state.set(RecordState::Recording);
+        });
+    };
+
+    // 2. STOP RECORDING
+    let stop_recording = move |_| {
+        media_recorder.with_value(|recorder| {
+            if let Some(r) = recorder {
+                let _ = r.stop();
+                // Stop microphone hardware access immediately
+                let stream = r.stream();
+                let tracks = stream.get_tracks();
+                for i in 0..tracks.length() {
+                    let track: web_sys::MediaStreamTrack = tracks.get(i).unchecked_into();
+                    track.stop();
+                }
+            }
+        });
+    };
+
+    // 3. RESET/DELETE RECORDING
+    let reset_recorder = move |_| {
+        if let RecordState::Finished(ref url) = state.get_untracked() {
+            let _ = Url::revoke_object_url(url); // Free up browser memory
+        }
+        state.set(RecordState::Idle);
+    };
+
+    view! {
+        <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 max-w-sm flex flex-col gap-3 shadow-sm">
+            <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">"Voice Note"</h3>
+            
+            <div class="flex items-center gap-2">
+                {move || match state.get() {
+                    RecordState::Idle => view! {
+                        <button 
+                            on:click=start_recording
+                            class="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
+                        >
+                            <span class="w-2 h-2 rounded-full bg-white animate-pulse" />
+                            "Record"
+                        </button>
+                    }.into_any(),
+                    
+                    RecordState::Recording => view! {
+                        <button 
+                            on:click=stop_recording
+                            class="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-medium transition-colors"
+                        >
+                            <span class="w-2 h-2 rounded-full bg-white animate-ping" />
+                            "Stop"
+                        </button>
+                    }.into_any(),
+                    
+                    RecordState::Finished(url) => view! {
+                        <div class="flex flex-col gap-2 w-full">
+                            // Native browser html audio player
+                            <audio controls src=url class="w-full h-8" />
+                            
+                            <div class="flex gap-2 justify-end">
+                                <button 
+                                    on:click=reset_recorder
+                                    class="px-2.5 py-1 text-gray-500 hover:text-red-600 text-xs font-medium transition-colors"
+                                >
+                                    "Delete"
+                                </button>
+                                <button 
+                                    on:click=move |_| { /* Logic to upload file to backend goes here */ }
+                                    class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-xs font-medium transition-colors"
+                                >
+                                    "Send"
+                                </button>
+                            </div>
+                        </div>
+                    }.into_any(),
+                }}
+            </div>
+        </div>
+    }
+}
+
+toml[dependencies]
+leptos = { version = "0.7" } # or your current version
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "Navigator",
+  "MediaDevices",
+  "MediaStream",
+  "MediaRecorder",
+  "MediaRecorderOptions",
+  "Blob",
+  "BlobPropertyBag",
+  "Url",
+  "HtmlAudioElement"
+]
