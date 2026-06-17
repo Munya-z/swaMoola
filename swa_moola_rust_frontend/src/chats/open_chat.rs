@@ -5,15 +5,8 @@ use reqwest::Method;
 use chrono::{DateTime, Utc, Datelike};
 use leptos::{serde_json, html::Ul};
 use leptos_router::{NavigateOptions,hooks::{use_navigate, use_params, use_location}};
-use ml_kem::Decapsulate;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce, aead::{Aead, KeyInit}};
-use x25519_dalek::{StaticSecret, PublicKey as XPublicKey};
-use ml_kem::ml_kem_768::{DecapsulationKey, Ciphertext};
-use std::{error::Error};
-use crate::chats::models::{SecretInnerPayload, Envelope};
-use sha2::Sha256;
-use sha2::Digest;
+use crate::chats::models::{SecretInnerPayload};
 
 use crate::auth::create_ecryption_keys::load_private_keys_locally;
 use crate::auth::models::AuthenticatedUser; 
@@ -23,7 +16,8 @@ use crate::chats::models::{ChatParams, ConversationPayload, SearchResult,ChatPay
 use crate::chats::chats_list::ChatsList;
 use crate::chats::ws_hooks::use_websocket_listener;
 use crate::chats::message_bubble::message_viewer::MessageViewer;
-
+use crate::chats::message_decryption::decrypt_message_payload::decrypt_message_with_fallback;
+use crate::chats::models::UserPublicKeys;
 
 fn format_chat_time(dt: &DateTime<Utc>) -> String {
     let local_time = dt.with_timezone(&chrono::Local);
@@ -399,23 +393,19 @@ pub fn OpenChat() -> impl IntoView {
                             {
                                 let payload = chat_name_resource.get().flatten().unwrap();
                                 
-                                let r_x25519 = payload.x_public.as_ref()
-                                    .and_then(|s| base64::engine::general_purpose::STANDARD.decode(s).ok())
-                                    .and_then(|bytes| bytes.try_into().ok())
-                                    .unwrap_or([0u8; 32]);
-
-                                let r_mlkem = payload.pq_public.as_ref()
-                                    .and_then(|s| base64::engine::general_purpose::STANDARD.decode(s).ok())
-                                    .and_then(|bytes| bytes.try_into().ok())
-                                    .unwrap_or([0u8; 1184]);
+                                let recipients: Vec<UserPublicKeys> = vec![
+                                    UserPublicKeys::new(
+                                        payload.x_public.as_ref(), 
+                                        payload.pq_public.as_ref()
+                                    )
+                                ];
 
                                 view! {
                                     <MessageInput 
                                         recipient_id=derived_recipient_id 
                                         is_recipient=is_recipient_route()
                                         on_success=Callback::new(move |_| refresh_trigger.notify())
-                                        r_x25519=r_x25519
-                                        r_mlkem=r_mlkem
+                                        recipients
                                         s_x25519=user_x_public
                                         s_mlkem=user_pq_public
                                     /> 
@@ -431,104 +421,6 @@ pub fn OpenChat() -> impl IntoView {
     </div>
     }
 }
-
-
-pub fn decrypt_message_with_fallback(
-    payload: &InboundMessagePayload,
-    my_x25519_private: &[u8; 32],
-    my_mlkem_private: &[u8; 64], 
-) -> Result<SecretInnerPayload, Box<dyn Error>> {
-    
-   
-    if let Ok(inner_payload) = execute_envelope_decryption_track(
-        &payload.ciphertext,
-        &payload.nonce,
-        &payload.r_envelope,
-        my_x25519_private,
-        my_mlkem_private,
-    ) {
-        return Ok(inner_payload);
-    }
-
-    execute_envelope_decryption_track(
-        &payload.ciphertext,
-        &payload.nonce,
-        &payload.s_envelope,
-        my_x25519_private,
-        my_mlkem_private,
-    )
-    .map_err(|e| {
-        format!("Cryptographic authentication failure. Key mismatch or payload tampered: {}", e).into()
-    })
-}
-
-fn execute_envelope_decryption_track(
-    main_ciphertext_b64: &str,
-    main_nonce_b64: &str,
-    envelope: &Envelope,
-    my_x25519_private: &[u8; 32],
-    my_mlkem_private: &[u8; 64],
-) -> Result<SecretInnerPayload, Box<dyn Error>> {
-    // 1. Unpack Base64 collections
-    let remote_x25519_bytes = STANDARD.decode(&envelope.ephemeral_x25519)?;
-    let remote_pq_bytes = STANDARD.decode(&envelope.pq_ciphertext)?;
-    let wrapped_master_key = STANDARD.decode(&envelope.encrypted_master_key)?;
-
-    // 2. Classical Layer Calculation
-    let my_static_secret = StaticSecret::from(*my_x25519_private);
-    let mut x25519_pub_bytes = [0u8; 32];
-    x25519_pub_bytes.copy_from_slice(&remote_x25519_bytes[..32]);
-    let remote_x25519_pub = XPublicKey::from(x25519_pub_bytes);
-    let x25519_shared = my_static_secret.diffie_hellman(&remote_x25519_pub);
-    let x25519_shared_bytes: [u8; 32] = x25519_shared.to_bytes();
-
-    // 1. Extract the 64-byte seed from your private key array/slice
-    let seed_bytes: [u8; 64] = my_mlkem_private[..64].try_into().map_err(|_| "Invalid seed length")?;
-    // 2. Wrap it into the hybrid_array expected by the crate
-    let seed = hybrid_array::Array::from(seed_bytes);
-    
-    // 3. Initialize the key (this uses From, so it doesn't need a trailing `?`)
-    let my_decaps_key = DecapsulationKey::from(seed);
-
-    // 3. Post-Quantum Layer Calculation
-    let pq_ciphertext_input = Ciphertext::try_from(remote_pq_bytes.as_slice())?;
-    let ml_kem_shared = my_decaps_key.decapsulate(&pq_ciphertext_input);
-
-    // 4. Extract Key Encryption Key (KEK) using SHA-256
-    let mut combined_secrets = Vec::new();
-    combined_secrets.extend_from_slice(&x25519_shared_bytes);
-    combined_secrets.extend_from_slice(ml_kem_shared.as_slice());
-    let derived_kek = Sha256::digest(&combined_secrets);
-    
-    // 5. Unpack the original master message key from the envelope container
-    let kek_cipher = ChaCha20Poly1305::new(Key::from_slice(&derived_kek));
-    let fixed_envelope_nonce = Nonce::from_slice(&[0u8; 12]);
-
-    let decrypted_key_bytes = kek_cipher.decrypt(fixed_envelope_nonce, wrapped_master_key.as_slice())
-    .map_err(|e| {
-        log::error!("Envelope decryption failed with the from decrypted kek_cipher.");
-        format!("Envelope decryption failed: {:?}", e)})?;
-    
-    let mut master_msg_key = [0u8; 32];
-    master_msg_key.copy_from_slice(&decrypted_key_bytes[..32]);
-
-
-    // 6. Decrypt Core Payload Data Body
-    let raw_ciphertext = STANDARD.decode(main_ciphertext_b64)?;
-    let raw_nonce = STANDARD.decode(main_nonce_b64)?;
-
-    let cipher = ChaCha20Poly1305::new(Key::from_slice(&master_msg_key));
-    let nonce = Nonce::from_slice(&raw_nonce);
-    let decrypted_bytes = cipher.decrypt(nonce, raw_ciphertext.as_slice())
-    .map_err(|e|{
-        format!("Core payload decryption failed: {:?}", e)
-    })?;
-
-    // 7. Reconstruct inner payload structural metadata
-    let inner_data: SecretInnerPayload = serde_json::from_slice(&decrypted_bytes)?;
-    Ok(inner_data)
-}
-
 
 pub fn get_and_clear_search_result() -> Result<Option<SearchResult>, wasm_bindgen::JsValue> {
     let storage = web_sys::window()

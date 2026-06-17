@@ -63,20 +63,30 @@ pub fn SecureVideo(
     });
 
     view! {
-        <Transition fallback=move || view! { <div class="text-xs text-gray-400"> "Loading video..." </div> }>
+        <Suspense fallback=move || view! { <div class="text-xs text-gray-400"> "Loading video..." </div> }>
             {move || video_src_resource.get().map(|maybe_src| {
-                if let Some(src) = maybe_src {
-                    view! {
-                         <video src=src controls class="w-full h-auto rounded object-cover">
+                let value = maybe_src.clone();
+                view! {
+                <div class="w-full h-auto min-h-[150px] rounded overflow-hidden bg-gray-900/10 flex items-center justify-center">
+                    <Show
+                        when=move || value.is_some()
+                        fallback=move || view! {
+                            <div class="text-xs text-red-500 p-4"> "Failed to display video" </div>
+                        }
+                    >
+                        // The video tag is safe here and won't disrupt the layout structure
+                        <video 
+                            src=maybe_src.clone().unwrap_or_default() 
+                            controls 
+                            preload="none" 
+                            class="w-full h-auto object-cover"
+                        >
                             "Your browser does not support the video tag."
                         </video>
-                    }.into_any()
-                } else {
-                    view! {
-                         <div class="text-xs text-red-500"> "Failed to display video" </div> 
-                    }.into_any()
-                }
+                    </Show>
+                </div>
+            }.into_any()
             })}
-        </Transition>
+        </Suspense>
     }
 }

@@ -214,9 +214,10 @@ pub fn generate_discoverable_key() -> String {
 pub async fn refresh_user_key(
     State(pool): State<PgPool>,
     Path(user_id): Path<Uuid>,
-) -> impl IntoResponse {
+) -> impl IntoResponse{
     
     let new_key = generate_discoverable_key();
+    println!("new key {}", &new_key);
 
     let update_result = sqlx::query!(
         "UPDATE users SET discoverable_key = $1 WHERE id = $2",
@@ -225,11 +226,15 @@ pub async fn refresh_user_key(
     )
     .execute(&pool)
     .await;
+    
 
     match update_result {
-        Ok(_) => (StatusCode::OK, new_key),
+        Ok(_) => {
+            println!("update_result have worked with Ok");
+            (StatusCode::OK, Json(new_key)).into_response()
+        },
         Err(_) => {
-            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to generate key".to_string())
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to generate key".to_string()).into_response()
         }
     }
 }

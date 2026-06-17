@@ -54,7 +54,7 @@ pub fn App() -> impl IntoView {
                     <Route path=path!("/register") view=RegisterComponent/>
                     <Route path=path!("/chats") view=ChatsList/>
                     <Route path=path!("/chats/c") view=OpenChat/>
-                    // Dynamic parameter example
+                    // Dynamic parameters
                     <Route path=path!("/chats/:id") view=OpenChat/>
                     <Route path=path!("/chats/c/:id") view=OpenChat/>
                 </Routes>
@@ -66,13 +66,9 @@ pub fn App() -> impl IntoView {
 fn main() {
     wasm_logger::init(wasm_logger::Config::default());
     leptos::mount::mount_to_body(App);
+   
 }
 
 
-// CREATE TABLE user_presence (
-//     user_id BIGINT PRIMARY KEY,
-//     last_seen TIMESTAMP WITH TIME ZONE,
-//     is_visible BOOLEAN DEFAULT TRUE -- The user's privacy preference
-// );
 
 

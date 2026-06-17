@@ -38,8 +38,7 @@ pub struct Message {
     pub conv_id: Uuid,
     pub ciphertext: String,
     pub nonce: String,
-    pub s_envelope: sqlx::types::Json<serde_json::Value>, 
-    pub r_envelope: sqlx::types::Json<serde_json::Value>,
+    pub envelopes: sqlx::types::Json<Vec<DbEnvelope>>, 
 }
 
 #[derive(Serialize, Deserialize, sqlx::FromRow, Clone, Debug)] 
@@ -48,8 +47,7 @@ pub struct MessageReturn {
     pub conv_id: Uuid,
     pub ciphertext: String,
     pub nonce: String,
-    pub s_envelope: sqlx::types::Json<DbEnvelope>,
-    pub r_envelope: sqlx::types::Json<DbEnvelope>,
+    pub envelopes: sqlx::types::Json<Vec<DbEnvelope>>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -59,6 +57,14 @@ pub struct DbEnvelope {
     pub pq_ciphertext: String,
     pub encrypted_master_key: String, // Forces SQLx to map this column field
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EncryptedMessagePayload {
+    pub ciphertext: String,
+    pub nonce: String,
+    pub envelopes: Vec<DbEnvelope>,
+}
+ 
 
 #[derive(Debug,Clone , Deserialize)] 
 pub struct AddParticipantPayload {

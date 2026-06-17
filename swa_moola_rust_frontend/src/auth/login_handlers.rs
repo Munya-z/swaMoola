@@ -2,8 +2,6 @@ use leptos::{prelude::*,task::spawn_local, serde_json};
 use leptos_router::NavigateOptions;
 use crate::auth_state::AuthState;
 use crate::auth::models::{ LoginResponse, LoginCredentials };
-use crate::auth::create_ecryption_keys::generate_hybrid_identities;
-
 
 pub fn login_handler(
     phone_number: ReadSignal<String>,

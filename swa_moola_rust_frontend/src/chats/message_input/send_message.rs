@@ -1,4 +1,5 @@
 use leptos::prelude::*; 
+use crate::chats::models::UserPublicKeys;
 use crate::interceptor::authenticated_multipart_fetch; 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use chrono::Utc;
@@ -14,6 +15,7 @@ use crate::chats::message_encryption::encrypt_files::upload_encrypted_file_to_st
 use crate::chats::message_encryption::encrypt_message_payload::prepare_full_payload;
 use crate::chats::models::{ SecretInnerPayload, AttachmentMeta};
 use crate::chats::models::InboundMessagePayload;
+use crate::chats::message_input::compresion::{convert_to_clean_webp_bytes, convert_to_compressed_audio_bytes};
 
 
 pub fn generate_random_32_bytes() -> [u8; 32] {
@@ -37,8 +39,7 @@ pub fn send_message(
     navigate: impl Fn(&str, NavigateOptions) + Clone + 'static,
     s_x25519: [u8; 32], 
     s_mlkem: [u8; 1184],
-    r_x25519: [u8; 32], 
-    r_mlkem: [u8; 1184],
+    recipients: Vec<UserPublicKeys>,
 ){
     error_msg.set(None);
     let raw_content = content.get_untracked();
@@ -72,28 +73,49 @@ pub fn send_message(
             let file_type = file.type_();
             let file_size = file.size() as i32;
             let navigate_clone = navigate.clone();
+            log::info!("after sending voice note {:?}", &file_type);
             
-            let array_buffer_promise = file.array_buffer();
-            if let Ok(buffer_value) = JsFuture::from(array_buffer_promise).await {
-                let js_array = js_sys::Uint8Array::new(&buffer_value);
-                let raw_file_bytes = js_array.to_vec();
-                
-                let file_secret_key = generate_random_32_bytes();
-                
-                let (encrypted_file_bytes, nonce_base) = encrypt_raw_file_bytes(&raw_file_bytes, &file_secret_key).expect("Symmetric file encryption operation failed unexpectedly");
-                
-                let storage_url = upload_encrypted_file_to_storage(navigate_clone, encrypted_file_bytes).await.unwrap();
-                log::info!("the storage url {:?}", &storage_url);
-                attachments.push(AttachmentMeta {
-                    file_name,
-                    file_type,
-                    file_size,
-                    storage_url :  storage_url.clone(),
-                    file_key: STANDARD.encode(file_secret_key),
-                    nonce_base: STANDARD.encode(nonce_base),
-                });
-            }
+            
+            let (raw_file_bytes, final_file_type) = if file_type.starts_with("audio/") {
+                match convert_to_compressed_audio_bytes(file.clone()).await {
+                    Ok(bytes) => (bytes, "audio/wav".to_string()),
+                    Err(_) => {
+                        let array_buffer = JsFuture::from(file.array_buffer()).await.unwrap();
+                        (js_sys::Uint8Array::new(&array_buffer).to_vec(), file_type.clone())
+                    }
+                }
+            } else if file_type.starts_with("image/") {
+                match convert_to_clean_webp_bytes(file.clone()).await {
+                    Ok(bytes) => (bytes, "image/webp".to_string()),
+                    Err(_) => {
+                        let array_buffer = JsFuture::from(file.array_buffer()).await.unwrap();
+                        (js_sys::Uint8Array::new(&array_buffer).to_vec(), file_type.clone())
+                    }
+                }
+            } else {
+                let array_buffer_promise = file.array_buffer();
+                if let Ok(buffer_value) = JsFuture::from(array_buffer_promise).await {
+                    (js_sys::Uint8Array::new(&buffer_value).to_vec(), file_type.clone())
+                } else {
+                    continue;
+                }
+            };
+            
+            let file_secret_key = generate_random_32_bytes();
+            
+            let (encrypted_file_bytes, nonce_base) = encrypt_raw_file_bytes(&raw_file_bytes, &file_secret_key).expect("Symmetric file encryption operation failed unexpectedly");
+            
+            let storage_url = upload_encrypted_file_to_storage(navigate_clone, encrypted_file_bytes).await.unwrap();
+            attachments.push(AttachmentMeta {
+                file_name,
+                file_type : final_file_type,
+                file_size,
+                storage_url :  storage_url.clone(),
+                file_key: STANDARD.encode(file_secret_key),
+                nonce_base: STANDARD.encode(nonce_base),
+            });
         }
+    
 
         let inner_data = SecretInnerPayload {
             sender_id: sender_uuid,
@@ -106,8 +128,7 @@ pub fn send_message(
             inner_data,
             s_x25519, 
             s_mlkem,
-            r_x25519, 
-            r_mlkem,
+            recipients,
             recipient_id
         );
 
@@ -115,8 +136,8 @@ pub fn send_message(
             .text("recipient_id", recipient_id.to_string())    
             .text("ciphertext", final_payload.ciphertext)
             .text("nonce", final_payload.nonce)
-            .text("s_envelope", serde_json::to_string(&final_payload.s_envelope).unwrap())
-            .text("r_envelope", serde_json::to_string(&final_payload.r_envelope).unwrap()); 
+            .text("envelopes", serde_json::to_string(&final_payload.envelopes).unwrap());
+ 
 
         let res: Result<reqwest::Response, reqwest::Error> = 
             authenticated_multipart_fetch(Method::POST, &url, navigate.clone(), Some(form)).await; 

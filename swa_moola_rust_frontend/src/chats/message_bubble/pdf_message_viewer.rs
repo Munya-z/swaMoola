@@ -64,7 +64,7 @@ pub fn SecurePdf(
     });
 
     view! {
-        <Transition fallback=move || view! { <div class="text-xs text-gray-400"> "Loading video..." </div> }>
+        <Suspense fallback=move || view! { <div class="text-xs text-gray-400"> "Loading video..." </div> }>
             {move || pdf_src_resource.get().map(|maybe_src| {
                 if let Some(src) = maybe_src {
                     view! {
@@ -84,6 +84,6 @@ pub fn SecurePdf(
                     }.into_any()
                 }
             })}
-        </Transition>
+        </Suspense>
     }
 }

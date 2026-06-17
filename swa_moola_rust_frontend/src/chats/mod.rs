@@ -5,3 +5,4 @@ pub mod ws_hooks;
 pub mod message_input;
 pub mod message_bubble;
 pub mod message_encryption;
+pub mod message_decryption;

@@ -1,0 +1,73 @@
+backend code 
+
+use axum::{extract::Query, response::Json, routing::get, Router};
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+pub struct PaginationParams {
+    limit: Option<usize>,
+    offset: Option<usize>,
+}
+
+async fn get_messages(Query(params): Query<PaginationParams>) -> Json<Vec<Message>> {
+    let limit = params.limit.unwrap_or(20);
+    let offset = params.offset.unwrap_or(0);
+
+    // SQL Example: 
+    // "SELECT * FROM messages ORDER BY created_at DESC LIMIT $1 OFFSET $2"
+    let messages = database::fetch_chat_history(limit, offset).await;
+
+    Json(messages)
+}
+
+pub fn app_router() -> Router {
+    Router::new().route("/api/messages", get(get_messages))
+}
+
+front_end Code 
+
+use leptos::*;
+use leptos_use::{use_intersection_observer, UseIntersectionObserverReturn};
+
+#[component]
+pub fn ChatWindow() -> impl IntoView {
+    // 1. Create a reference to anchor our invisible top element
+    let sentinel_ref = create_node_ref::<html::Div>();
+    
+    // 2. Track our pagination offset and loading state
+    let (offset, set_offset) = create_signal(0);
+    let (is_loading, set_loading) = create_signal(false);
+
+    // 3. Set up the intersection observer
+    let UseIntersectionObserverReturn { is_intersecting, .. } = use_intersection_observer(
+        sentinel_ref,
+        move |entries, _| {
+            // Check if the sentinel element is visible on screen
+            if entries[0].is_intersecting() && !is_loading.get() {
+                set_loading.set(true);
+                
+                // Trigger your API call to Axum here!
+                // Example: fetch_older_messages(offset.get());
+                
+                // Increase offset for the NEXT scroll trigger
+                set_offset.update(|n| *n += 20);
+                set_loading.set(false);
+            }
+        },
+    );
+
+    view! {
+        <div class="chat-container" style="overflow-y: scroll; height: 500px;">
+            // This invisible div sits at the top of the chat
+            <div node_ref=sentinel_ref style="height: 1px; width: 100%;"></div>
+            
+            // Show a tiny spinner while older media loads
+            <Show when=move || is_loading.get()>
+                <p>"Loading older history..."</p>
+            </Show>
+
+            // Your actual chat list using Leptos <For /> goes here
+            // <For each=... />
+        </div>
+    }
+}

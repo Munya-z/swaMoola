@@ -1,7 +1,6 @@
 use leptos_router::{components::*, hooks::use_navigate};
-use leptos::{prelude::*,task::spawn_local, ev};
+use leptos::{prelude::*, ev};
 
-use crate::auth::models::RegisterCredentials;
 
 #[component]
 pub fn RegisterComponent() -> impl IntoView {

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid; 
 use chrono::{DateTime, Utc}; 
 use leptos_router::params::Params;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 #[derive(Params, PartialEq, Clone, Debug)]
 pub struct ChatParams {
@@ -85,8 +86,7 @@ pub struct OutboundMessagePayload {
     pub recipient_id: Uuid,
     pub ciphertext: String,       
     pub nonce: String,            
-    pub s_envelope: Envelope,
-    pub r_envelope: Envelope,
+    pub envelopes: Vec<Envelope>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -95,8 +95,7 @@ pub struct InboundMessagePayload {
     pub conv_id: Uuid,
     pub ciphertext: String,
     pub nonce: String,
-    pub s_envelope: Envelope, 
-    pub r_envelope: Envelope,
+    pub envelopes: Vec<Envelope>, 
     pub created_at: DateTime<Utc>,
 }
 
@@ -106,4 +105,27 @@ pub struct Envelope {
     pub ephemeral_x25519: String, 
     pub pq_ciphertext: String,
     pub encrypted_master_key: String,    
+}
+
+#[derive(Debug, Clone)]
+pub struct UserPublicKeys {
+    pub x25519: [u8; 32],
+    pub mlkem: [u8; 1184],
+}
+
+impl UserPublicKeys {
+    pub fn new(x_public: Option<&String>, pq_public: Option<&String>) -> Self {
+   
+        let x25519 = x_public
+            .and_then(|s| STANDARD.decode(s).ok())
+            .and_then(|bytes| bytes.try_into().ok())
+            .unwrap_or([0u8; 32]);
+
+        let mlkem = pq_public
+            .and_then(|s| STANDARD.decode(s).ok())
+            .and_then(|bytes| bytes.try_into().ok())
+            .unwrap_or([0u8; 1184]);
+
+        Self { x25519, mlkem }
+    }
 }

@@ -53,7 +53,7 @@ async fn main() {
         "http://localhost:8080".parse().unwrap(),
         "http://127.0.0.1:8080".parse().unwrap()
     ])
-    .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
+    .allow_methods([Method::GET, Method::POST, Method::PUT, Method::PATCH, Method::DELETE])
     .allow_headers([AUTHORIZATION, CONTENT_TYPE, UPGRADE, CONNECTION])
     .allow_credentials(true);
 

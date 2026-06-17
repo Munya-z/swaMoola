@@ -18,21 +18,12 @@ pub fn decrypt_raw_file_bytes(
         .map_err(|e| format!("Second Base64 decode failed. Is this an old single-encoded asset?: {:?}", e))?;
 
     let key = Key::from_slice(file_secret_key);
-    log::info!("key from slice worked {:?}", &key);
     let cipher = ChaCha20Poly1305::new(key);
-    log::info!("cypher worked");
-    // 3. Build the nonce (Expects 12 bytes)
     let nonce = Nonce::from_slice(&real_nonce_bytes);
-    log::info!("nonce from slice worked {:?}", &nonce);
-    log::info!("the encryted bytes {:?}", &encrypted_bytes[..5]);
-    // 4. Decrypt the data
     let decrypted_bytes = cipher.decrypt(nonce, encrypted_bytes)
         .map_err(|e|{
-            log::info!("this worked {}", e);
-          format!("Symmetric decryption failed: {:?}", e)  
+            format!("Symmetric decryption failed: {:?}", e)  
         } )?;
-    log::info!("decrypted_bytes worked {:?}", &decrypted_bytes[..5]);
-
     Ok(decrypted_bytes)
 }
 

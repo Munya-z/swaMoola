@@ -6,7 +6,6 @@ use crate::chats::message_bubble::audio_message_viewer::SecureAudio;
 use crate::chats::message_bubble::pdf_message_viewer::SecurePdf;
 use crate::chats::message_bubble::zip_message_viewer::SecureZip;
 
-
 #[component]
 pub fn MessageViewer(
     msg_content: Option<String>,
@@ -108,9 +107,9 @@ pub fn MessageViewer(
                                     let audio_mime = mime.clone();
 
                                     view! {
-                                        <div class="max-w-xs w-full min-w-[150px] flex items-center overflow-hidden">
+                                        <div class="max-w-xs w-full overflow-hidden">
                                             <SecureAudio 
-                                                media_url=audio_url 
+                                                media_url=audio_url
                                                 file_type=audio_mime
                                                 file_key=key
                                                 nonce_base=nonce

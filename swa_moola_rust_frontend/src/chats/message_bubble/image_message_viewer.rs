@@ -49,7 +49,7 @@ pub fn SecureImage(media_url: String,
     });
 
     view! {
-        <Transition fallback=move || view! { <div class="text-xs text-gray-400"> "Loading..." </div> }>
+        <Suspense fallback=move || view! { <div class="text-xs text-gray-400"> "Loading..." </div> }>
             {move || image_src_resource.get().map(|maybe_src| {
                 if let Some(src) = maybe_src {
 
@@ -57,8 +57,9 @@ pub fn SecureImage(media_url: String,
 
                     view! {
                         <img 
-                            src= saved_src.get_value() 
-                            alt=alt_text_signal.get() 
+                            src= move || saved_src.get_value() 
+                            alt= move || alt_text_signal.get() 
+                            loading="lazy"
                             class="w-full h-auto rounded object-cover" 
                             on:click=move |_| is_expanded.set(true)
                         />
@@ -81,8 +82,8 @@ pub fn SecureImage(media_url: String,
 
                                 // The large full-page image
                                 <img 
-                                    src=saved_src.get_value() 
-                                    alt=alt_text_signal.get() 
+                                    src=move || saved_src.get_value() 
+                                    alt=move || alt_text_signal.get() 
                                     class="max-w-[95vw] max-h-[95vh] object-contain rounded select-none shadow-2xl"
                                 />
                             </div>
@@ -94,7 +95,7 @@ pub fn SecureImage(media_url: String,
                     }.into_any()
                 }
             })}
-        </Transition>
+        </Suspense>
     }
 }
 

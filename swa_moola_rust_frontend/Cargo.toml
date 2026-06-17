@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-leptos = { version = "0.8.19", features = ["csr"] }
+leptos = { version = "0.8.19", features = ["csr", "hydrate"] }
 leptos_router = { version = "0.8.13"}
 leptos-use = { version = "0.18.3", features = ["storage"] }
 serde = { version = "1", features = ["derive"]}
@@ -16,7 +16,8 @@ once_cell = "1.21.4"
 chrono = { version ="0.4.44", features = ["serde"]}
 console_error_panic_hook = "0.1.7"
 ws_stream_wasm = "0.7.5"
-futures-util = "0.3" 
+futures-util = { version = "0.3", features = ["channel"] }
+futures-channel = "0.3" 
 js-sys = "0.3.99"
 wasm-bindgen-futures = "0.4.72"
 wasm-bindgen = "0.2"
@@ -35,7 +36,25 @@ hybrid-array = "0.4.12"
 
 [dependencies.web-sys]
 version = "0.3"
-features = ["Window",  "Performance", "Response", "Blob","BlobPropertyBag", "Url"]
+features = [
+"Window",
+"Performance", 
+"Response",
+"Navigator",
+"MediaDevices",
+"MediaStream",
+"MediaRecorder",
+"MediaRecorderOptions",
+"MediaStreamConstraints",
+"FilePropertyBag",
+"Blob",
+"BlobPropertyBag",
+"Url",
+"HtmlAudioElement",
+"CanvasRenderingContext2d",
+"AudioContext",
+"AudioBuffer"
+]
 
 [package.metadata.leptos]
 assets-dir = "public"

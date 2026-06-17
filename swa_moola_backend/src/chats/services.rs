@@ -25,8 +25,7 @@ pub async fn get_conversation_messages(
             m.created_at as "created_at!",
             m.ciphertext as "ciphertext!",
             m.nonce as "nonce!",
-            m.s_envelope as "s_envelope!: sqlx::types::Json<DbEnvelope>",
-            m.r_envelope as "r_envelope!: sqlx::types::Json<DbEnvelope>"
+            m.envelopes as "envelopes!: sqlx::types::Json<Vec<DbEnvelope>>"
         FROM messages m
         WHERE m.conv_id = $1
         ORDER BY m.created_at ASC

@@ -19,9 +19,7 @@ CREATE TABLE messages (
 
 ALTER TABLE messages ADD COLUMN ciphertext TEXT NOT NULL;
 ALTER TABLE messages ADD COLUMN nonce TEXT NOT NULL;
-ALTER TABLE messages ADD COLUMN s_envelope JSONB NOT NULL;
-ALTER TABLE messages ADD COLUMN r_envelope JSONB NOT NULL;
-
+ALTER TABLE messages ADD COLUMN envelopes JSONB NOT NULL;
 
 ALTER TABLE conversations ADD COLUMN last_message_id UUID REFERENCES messages(msg_id) ON DELETE SET NULL;
 

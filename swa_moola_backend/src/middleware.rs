@@ -37,6 +37,7 @@ pub async fn auth_middleware(
     mut req: Request<axum::body::Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
+    println!("Auth middleware intercepted request to: {}", req.uri());
 
     if req.method() == axum::http::Method::OPTIONS {
         return Ok(next.run(req).await);
@@ -63,5 +64,7 @@ pub async fn auth_middleware(
 
     req.extensions_mut().insert(AuthenticatedUser { uuid: user_id , name: None, trust_score: None , active_transactions:  None, discoverable_key: None, x_public: None, pq_public: None });
 
-    Ok(next.run(req).await)
+    let response = next.run(req).await;
+    println!("Auth middleware response status: {}", response.status());
+    Ok(response)
 }

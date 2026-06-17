@@ -10,7 +10,10 @@ pub fn SecureAudio(
     file_type: String ,
     file_key: String,   
     nonce_base: String,
-) -> impl IntoView {
+) -> AnyView{
+
+    log::info!("🔊 [SecureAudio] Component initialized for URL: {}, and file type: {}", media_url, file_key);
+
     let tracking_signal = Memo::new(move |_| (media_url.clone(), file_type.clone()));
     let audio_src_resource = LocalResource::new(move || {
         let (url, mime_type) = tracking_signal.get();
@@ -63,11 +66,11 @@ pub fn SecureAudio(
     });
 
     view! {
-        <Transition fallback=move || view! { <div class="text-xs text-gray-400"> "Loading audio..." </div> }>
+        <Suspense fallback=move || view! { <div class="text-xs text-gray-400"> "Loading audio..." </div> }.into_any()>
             {move || audio_src_resource.get().map(|maybe_src| {
                 if let Some(src) = maybe_src {
                     view! {
-                        <audio src=src controls class="w-full">
+                        <audio src=src controls preload="metadata"  class="w-full">
                             "Your browser does not support the audio tag."
                         </audio>
                     }.into_any()
@@ -77,6 +80,6 @@ pub fn SecureAudio(
                     }.into_any()
                 }
             })}
-        </Transition>
-    }
+        </Suspense>
+    }.into_any()
 }
