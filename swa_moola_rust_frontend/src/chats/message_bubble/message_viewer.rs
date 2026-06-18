@@ -16,7 +16,7 @@ pub fn MessageViewer(
 
     view! {    
         <Show when=move || !attachments_clone.is_empty()>
-            <div class="mb-1 space-y-1">
+            <div class="mb-1 w-full space-y-1">
                 {attachments.clone().into_iter().map(|file| {
                     let media_url = file.storage_url.clone();
                     let key = file.file_key.clone();
@@ -38,13 +38,15 @@ pub fn MessageViewer(
 
                     // Video Matching
                     let is_video = file.file_type.starts_with("video/")
-                        || file_type_lower.contains("mp4")
-                        || file_type_lower.contains("webm")
-                        || file_type_lower.contains("ogg")
-                        || file_name_lower.ends_with(".mp4")
-                        || file_name_lower.ends_with(".webm")
-                        || file_name_lower.ends_with(".ogg");
-
+                        || file_type_lower.contains("video/mp4")
+                        || file_type_lower.contains("video/webm")
+                        || file_type_lower.contains("video/ogg")
+                        || (!file.file_type.starts_with("audio/") && (
+                            file_name_lower.ends_with(".mp4")
+                            || file_name_lower.ends_with(".webm")
+                            || file_name_lower.ends_with(".ogg")
+                        ));
+                        
                     // Audio Matching
                     let is_audio = file.file_type.starts_with("audio/")
                         || file_type_lower.contains("mp3")
@@ -73,7 +75,7 @@ pub fn MessageViewer(
                     let name = file.file_name.clone();
                     
                     view! {
-                        <div class="flex flex-col gap-2 shadow-sm">
+                        <div class="flex flex-col w-full gap-2 shadow-sm">
                             {
                                 let url = url_clone.clone();
                                 if is_image {
@@ -88,29 +90,29 @@ pub fn MessageViewer(
                                             />
                                         </div>
                                     }.into_any()
-                                } else if is_video {
-                                    let video_url = url.clone();
-                                    let video_mime = mime.clone();
-
-                                    view! {
-                                        <div class="max-w-xs w-full overflow-hidden">
-                                            <SecureVideo 
-                                                media_url=video_url
-                                                file_type=video_mime
-                                                file_key=key
-                                                nonce_base=nonce
-                                            />
-                                        </div>
-                                    }.into_any()
                                 } else if is_audio {
                                     let audio_url = url.clone();
                                     let audio_mime = mime.clone();
 
                                     view! {
-                                        <div class="max-w-xs w-full overflow-hidden">
+                                        <div class="max-w-xs  min-w-[150px] overflow-hidden">
                                             <SecureAudio 
                                                 media_url=audio_url
                                                 file_type=audio_mime
+                                                file_key=key
+                                                nonce_base=nonce
+                                            />
+                                        </div>
+                                    }.into_any()
+                                } else if is_video {
+                                    let video_url = url.clone();
+                                    let video_mime = mime.clone();
+
+                                    view! {
+                                        <div class="max-w-xs  overflow-hidden">
+                                            <SecureVideo 
+                                                media_url=video_url
+                                                file_type=video_mime
                                                 file_key=key
                                                 nonce_base=nonce
                                             />
@@ -167,8 +169,10 @@ pub fn MessageViewer(
             </div>
         </Show> 
 
-        {msg_content.map(|content| view! {
-            <div class="inline-block w-full min-w-[150px] p-4 mr-2">
+        {msg_content
+            .filter(|content| !content.trim().is_empty())
+            .map(|content| view! {
+            <div class="inline-block min-w-[150px] p-4 mr-2">
                 {content}
             </div>
         })}

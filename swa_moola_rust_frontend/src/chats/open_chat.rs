@@ -314,7 +314,7 @@ pub fn OpenChat() -> impl IntoView {
                     chat_messages.get().map(|data: Option<Vec<SecretInnerPayload>>| { 
                         match data { 
                             Some(msgs) => view! { 
-                                <ul node_ref=message_list_ref class="flex-1 overflow-y-auto z-10 px-6 pt-4 pb-24 space-y-2 scrollbar-thin"> 
+                                <ul node_ref=message_list_ref class="flex-1 overflow-y-auto w-full z-10 px-6 pt-4 pb-24 space-y-2 scrollbar-thin"> 
                                     {msgs.into_iter().map(|msg| {
                                         let is_sender = Some(msg.sender_id) == user_uuid_opt;
                                         let formatted_time = format_chat_time(&msg.timestamp_ms);
@@ -334,7 +334,7 @@ pub fn OpenChat() -> impl IntoView {
                                         if is_sender {
                                             view! { 
                                                 <div class="flex justify-end mb-1">
-                                                    <div class="bg-[#d9fdd3] text-[#111b21] pl-0 pr-0 py-1.5 rounded-lg rounded-tr-none max-w-[65%] shadow-sm relative group text-[14.2px] leading-relaxed break-words">
+                                                    <div class="bg-[#d9fdd3] overflow-hidden text-[#111b21] pl-0 pr-0 rounded-lg rounded-tr-none max-w-[75%] shadow-sm relative group text-[14.2px] leading-relaxed break-words">
                                                         <MessageViewer msg_content=msg_content msg_attachments=msg_attachments /> 
                                                         <span class="text-[11px] text-[#667781] absolute bottom-1 right-2 select-none whitespace-nowrap flex items-center gap-0.5">
                                                             {formatted_time}
@@ -348,7 +348,7 @@ pub fn OpenChat() -> impl IntoView {
                                         } else {
                                             view! { 
                                                 <div class="flex justify-start mb-1">
-                                                    <div class="bg-white text-[#111b21] pl-0 pr-0 py-1.5 rounded-lg rounded-tl-none max-w-[65%] shadow-sm relative text-[14.2px] leading-relaxed break-words">
+                                                    <div class="bg-white overflow-hidden text-[#111b21] pl-0 pr-0 rounded-lg rounded-tl-none max-w-[75%] shadow-sm relative text-[14.2px] leading-relaxed break-words">
                                                         <MessageViewer msg_content=msg_content msg_attachments=msg_attachments />
                                                         <span class="text-[11px] text-[#667781] absolute bottom-1 right-2 select-none whitespace-nowrap flex items-center gap-0.5">
                                                             {formatted_time}

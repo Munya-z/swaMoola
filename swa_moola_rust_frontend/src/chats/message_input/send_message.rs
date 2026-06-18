@@ -73,9 +73,7 @@ pub fn send_message(
             let file_type = file.type_();
             let file_size = file.size() as i32;
             let navigate_clone = navigate.clone();
-            log::info!("after sending voice note {:?}", &file_type);
-            
-            
+                     
             let (raw_file_bytes, final_file_type) = if file_type.starts_with("audio/") {
                 match convert_to_compressed_audio_bytes(file.clone()).await {
                     Ok(bytes) => (bytes, "audio/wav".to_string()),
