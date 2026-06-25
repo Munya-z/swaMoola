@@ -4,7 +4,7 @@ use axum::{extract::{State, Path}, Json, response::IntoResponse, http::StatusCod
 use crate::chats::models::{DbEnvelope, EncryptedMessagePayload};
 use crate::db::begin_rls_txn;
 use crate::chats::models::{Message};
-use crate::chats::conversation_handlers::{add_conversation_participant, find_existing_conversation, add_last_message_to_conversation, create_conversation};
+use crate::chats::conversation_handlers::{ add_last_message_to_conversation};
 
 async fn add_message_to_db(
     executor: &mut sqlx::PgConnection, 
@@ -45,7 +45,7 @@ pub async fn send_message(
     Path(user_id): Path<Uuid>,
     mut multipart: Multipart, 
 ) -> impl IntoResponse {
-    let mut recipient_id = None;
+    let mut conv_id = None;
 
     let mut ciphertext = None;
     let mut nonce = None;
@@ -56,9 +56,9 @@ pub async fn send_message(
             Ok(Some(field)) => {
                 if let Some(name) = field.name() {
                     match name {
-                        "recipient_id" => {
+                        "conv_id" => {
                             if let Ok(text) = field.text().await {
-                                recipient_id = Uuid::parse_str(text.trim()).ok();
+                                conv_id = Uuid::parse_str(text.trim()).ok();
                             }
                         }
                         "ciphertext" => {
@@ -81,10 +81,10 @@ pub async fn send_message(
         }
     }
 
-    let recipient_id = match recipient_id {
-        Some(r) => r,
+    let target_conv_id = match conv_id {
+        Some(id) => id,
         None => {
-            return (StatusCode::BAD_REQUEST, Json("Missing or invalid recipient_id")).into_response();
+            return (StatusCode::BAD_REQUEST, Json("Missing or invalid conv_id")).into_response();
         }
     };
 
@@ -112,7 +112,7 @@ pub async fn send_message(
     // 3. Parse JSON envelopes into your Rust structs
     let envelopes : Vec<DbEnvelope> = match serde_json::from_str(&env_raw) {
         Ok(env) => env,
-        Err(e) => {
+        Err(_) => {
             return (StatusCode::BAD_REQUEST, Json("Invalid envelope format")).into_response();
         }
     };
@@ -128,24 +128,6 @@ pub async fn send_message(
         Ok(tx) => tx,
         Err(e) => {
             return (StatusCode::INTERNAL_SERVER_ERROR, Json(format!("Failed to start transaction: {}", e))).into_response();
-        }
-    };
-
-    let target_conv_id = match find_existing_conversation(&mut *tx, user_id, recipient_id).await {
-        Ok(Some(id)) => id,
-        Ok(None) => {
-            let conv = match create_conversation(&mut *tx).await {
-                Ok(c) => c,
-                Err(e) => {
-                    return (StatusCode::INTERNAL_SERVER_ERROR, Json(e.to_string())).into_response();
-                }
-            };
-            let _ = add_conversation_participant(&mut *tx, conv.conv_id, user_id).await;
-            let _ = add_conversation_participant(&mut *tx, conv.conv_id, recipient_id).await;
-            conv.conv_id
-        },
-        Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(format!("Failed to locate conversation: {}", e))).into_response();
         }
     };
 

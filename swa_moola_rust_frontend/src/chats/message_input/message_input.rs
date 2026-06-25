@@ -1,19 +1,23 @@
-// use leptos::ev;
 use leptos::*;
 use leptos::prelude::*; 
 use leptos_router::hooks::use_navigate; 
+use serde::{Serialize};
 use js_sys::Array;
 use leptos::serde_json; 
 use uuid::Uuid;
+use reqwest::Method;
 use web_sys::MediaRecorder;
+use crate::interceptor::authenticated_fetch;
+use leptos_router::NavigateOptions;
 use crate::chats::message_input::send_message::send_message;
 use crate::chats::message_input::voice_message_input::{reset_voice_recorder, start_voice_recorder, stop_voice_recorder, RecordState};
 use crate::auth::models::AuthenticatedUser; 
-use crate::chats::models::UserPublicKeys;
+use crate::chats::models::{UserPublicKeys, ChatTarget};
+
 
 #[component]
 pub fn MessageInput(
-    recipient_id: Uuid,
+    target_id: Uuid,
     is_recipient: bool,
     recipients: Vec<UserPublicKeys>,
     s_x25519:[u8; 32],
@@ -33,6 +37,11 @@ pub fn MessageInput(
     
     let user_uuid = user.as_ref().map(|u| u.uuid.to_string()).unwrap_or_default();
     let sender_uuid = user.as_ref().map(|u| u.uuid).unwrap_or_else(Uuid::nil);
+    let sender_name =user
+        .as_ref()
+        .and_then(|u| u.name.as_deref())
+        .unwrap_or("Unknown User")
+        .to_string();
     let (files, set_files) = signal(Vec::<leptos::web_sys::File>::new());
 
     let state = RwSignal::new(RecordState::Idle);
@@ -50,22 +59,74 @@ pub fn MessageInput(
     let on_submit = move |ev: ev::SubmitEvent| {
         ev.prevent_default();
         let recipients_clone = recipients.clone();
-        send_message(
-            user_uuid.clone(),
-            sender_uuid,
-            recipient_id,
-            content,
-            set_content,
-            is_recipient,
-            files,      
-            set_files,
-            set_error_msg,
-            on_success,
-            navigate.clone(),
-            s_x25519,
-            s_mlkem,
-            recipients_clone
-        );
+        let navigate_clone = navigate.clone();
+        let user_uuid_clone =  user_uuid.clone();
+        let current_sender_name = sender_name.clone(); 
+
+        let target= if is_recipient{
+            ChatTarget::NewChat { recipient_id : target_id }
+        }else{
+            ChatTarget::ExistingChat { conv_id: target_id }
+        };
+        
+        leptos::task::spawn_local(async move {
+            match target {
+                ChatTarget::NewChat { recipient_id} => {
+                    let recipient_str = recipient_id.to_string();
+
+                    let new_room_result = create_new_conv_id(
+                    recipient_str, 
+                    navigate_clone.clone(), 
+                    user_uuid_clone.clone()
+                    ).await;
+                
+                    match new_room_result {
+                        Some(new_conv_id) => {
+                            send_message(
+                                user_uuid_clone.clone(),
+                                current_sender_name,
+                                sender_uuid,
+                                new_conv_id,
+                                content,
+                                set_content,
+                                is_recipient,
+                                files,      
+                                set_files,
+                                set_error_msg,
+                                on_success,
+                                navigate_clone,
+                                s_x25519,
+                                s_mlkem,
+                                recipients_clone
+                            );
+                        }
+                        None => {
+                            set_error_msg.set(Some(format!("Failed to initialize chat",)));
+                        }
+                    }
+                
+                },
+                ChatTarget::ExistingChat { conv_id } => {
+                    send_message(
+                        user_uuid_clone.clone(),
+                        current_sender_name,
+                        sender_uuid,
+                        conv_id,
+                        content,
+                        set_content,
+                        is_recipient,
+                        files,      
+                        set_files,
+                        set_error_msg,
+                        on_success,
+                        navigate_clone,
+                        s_x25519,
+                        s_mlkem,
+                        recipients_clone
+                    );   
+                }
+            }
+        });
         state.set(RecordState::Idle);
     }; 
 
@@ -84,7 +145,9 @@ pub fn MessageInput(
                                     set_files.update(|list| { list.remove(idx); });
                                 }
                             >
-                                "✕"
+                                <svg width="1.5rem" height="1.5rem" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                                    <path fill="#000000" d="M352 192V95.936a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32V192h256a32 32 0 1 1 0 64H96a32 32 0 0 1 0-64h256zm64 0h192v-64H416v64zM192 960a32 32 0 0 1-32-32V256h704v672a32 32 0 0 1-32 32H192zm224-192a32 32 0 0 0 32-32V416a32 32 0 0 0-64 0v320a32 32 0 0 0 32 32zm192 0a32 32 0 0 0 32-32V416a32 32 0 0 0-64 0v320a32 32 0 0 0 32 32z"/>
+                                </svg>
                             </button>
                         </div>
                     }
@@ -122,16 +185,24 @@ pub fn MessageInput(
                                     for="file-upload" 
                                     class="p-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl cursor-pointer transition-all active:scale-95 focus-within:ring-2 focus-within:ring-blue-500 shadow-sm"
                                 >
-                                    <svg xmlns="http://w3.org" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.707m-1.414 1.414a5 5 0 11-7.071-7.071l10.607-10.607a3.5 3.5 0 114.95 4.95L10.607 18.007a2 2 0 11-2.828-2.828l10.607-10.607m-4.243 4.243L8.485 14.586" />
+                                    <svg width="1.5rem" height="1.5rem" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M9 0H2V16H14V5L9 0ZM7 6V8H5V10H7V12H9V10H11V8H9V6H7Z" fill="#000000"/>
                                     </svg>
                                 </label>
                             </div>
                             <button 
+                                type="button"
                                 on:click=start_recording
-                                class="flex items-center gap-1.5 px-3 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
+                                class="flex items-center gap-1.5 px-3 py-3 bg-gray-100 hover:bg-blue-50 text-white rounded-lg text-xs font-medium transition-colors"
                             >
-                                <span class="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                <svg class="animate-pulse" fill="#000000" height="1.5rem" width="1.5rem" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
+                                    viewBox="0 0 512 512" enable-background="new 0 0 512 512" xml:space="preserve">
+                                    <path d="M155.7,320.3c2.8,23.3,24.9,42.4,49,42.4h87.8c24.1,0,46.2-19.1,49-42.4l11.7-96.6c2.8-23.3,2.8-61.4,0-84.8l-11.7-96.6
+                                        C338.6,19,316.5,0,292.4,0h-87.8c-24.1,0-46.2,19.1-49,42.4L144,138.9c-2.8,23.3-2.8,61.5,0,84.8L155.7,320.3z M419.1,170.7h-42.6
+                                        c0.4,19.5-0.3,40.2-2.2,55.6l-11.7,96.6c-4.1,34.3-34.9,61.1-70.2,61.1h-87.8c-35.2,0-66-26.9-70.2-61.1l-11.7-96.6
+                                        c-1.9-15.4-2.6-36.1-2.2-55.6H77.9c-0.4,21.3,0.4,43.6,2.5,60.7L92.1,328c6.7,55.3,56.1,98.6,112.5,98.6h22.6v42.7h-64V512h170.7
+                                        v-42.7h-64v-42.7h22.6c56.5,0,105.9-43.4,112.5-98.7l11.7-96.7C418.7,214.2,419.5,191.9,419.1,170.7z"/>
+                                </svg>
                             </button>
                             <div class="relative flex-1">
                                 <input 
@@ -145,10 +216,11 @@ pub fn MessageInput(
                             
                             <button 
                                 type="submit" 
-                                class="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md hover:shadow-lg active:scale-95 transition-all focus:outline-none"
+                                class="p-3 bg-gray-100 hover:bg-blue-50 text-white rounded-xl shadow-md hover:shadow-lg active:scale-95 transition-all focus:outline-none"
                             >
-                                <svg xmlns="w3.org" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 transform rotate-45 -translate-x-0.5 translate-y-0.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                                <svg fill="#000000" width="1.5rem" height="1.5rem" viewBox="0 0 32 32" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;" version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:serif="http://www.serif.com/" xmlns:xlink="http://www.w3.org/1999/xlink">
+                                    <path d="M11.499,19.173l5.801,-5.849c0.389,-0.392 1.022,-0.394 1.414,-0.006c0.392,0.389 0.395,1.022 0.006,1.414l-5.798,5.847l5.306,8.002c0.207,0.313 0.572,0.483 0.945,0.441c0.373,-0.042 0.691,-0.289 0.824,-0.64l9.024,-23.904c0.138,-0.366 0.05,-0.78 -0.226,-1.058c-0.276,-0.278 -0.689,-0.369 -1.057,-0.233l-24.004,8.892c-0.353,0.13 -0.602,0.448 -0.646,0.821c-0.044,0.373 0.125,0.74 0.438,0.948l7.973,5.325Z"/>
+                                    <g id="Icon"/>
                                 </svg>
                             </button>
                         }.into_any(),         
@@ -156,7 +228,7 @@ pub fn MessageInput(
                         RecordState::Recording => view! {
                             <button 
                                 on:click=stop_recording
-                                class="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-medium transition-colors"
+                                class="flex justify-end gap-1.5 px-3 py-2 bg-red-300 hover:bg-red-700 text-white rounded-lg text-xs font-medium transition-colors"
                             >
                                 <span class="w-2 h-2 rounded-full bg-white animate-ping" />
                                 "Stop"
@@ -165,24 +237,27 @@ pub fn MessageInput(
 
                         RecordState::Finished(url) => view! {
                             <div class="flex flex-row gap-2 w-full">
-                                // Native browser html audio player
+                                
                                 <audio controls src=url class="w-full min-w-400 h-8" />
                                 
                                 <div class="flex gap-2 justify-end">
                                     <button 
                                         on:click=reset_recorder
-                                        class="px-2.5 py-1 text-gray-500 hover:text-red-600 text-xs font-medium transition-colors"
+                                        class="px-2.5 py-1 text-gray-500 hover:bg-red-300 text-xs font-medium transition-colors"
                                     >
-                                        "Delete"
+                                        <svg width="1.5rem" height="1.5rem" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                                            <path fill="#000000" d="M352 192V95.936a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32V192h256a32 32 0 1 1 0 64H96a32 32 0 0 1 0-64h256zm64 0h192v-64H416v64zM192 960a32 32 0 0 1-32-32V256h704v672a32 32 0 0 1-32 32H192zm224-192a32 32 0 0 0 32-32V416a32 32 0 0 0-64 0v320a32 32 0 0 0 32 32zm192 0a32 32 0 0 0 32-32V416a32 32 0 0 0-64 0v320a32 32 0 0 0 32 32z"/>
+                                        </svg>
                                     </button>
                                     
                                 </div>
                                 <button 
                                     type="submit" 
-                                    class="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md hover:shadow-lg active:scale-95 transition-all focus:outline-none"
+                                    class="p-3 hover:bg-blue-50 text-white rounded-xl shadow-md hover:shadow-lg active:scale-95 transition-all focus:outline-none"
                                 >
-                                    <svg xmlns="w3.org" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 transform rotate-45 -translate-x-0.5 translate-y-0.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                                    <svg fill="#000000" width="1.5rem" height="1.5rem" viewBox="0 0 32 32" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;" version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:serif="http://www.serif.com/" xmlns:xlink="http://www.w3.org/1999/xlink">
+                                        <path d="M11.499,19.173l5.801,-5.849c0.389,-0.392 1.022,-0.394 1.414,-0.006c0.392,0.389 0.395,1.022 0.006,1.414l-5.798,5.847l5.306,8.002c0.207,0.313 0.572,0.483 0.945,0.441c0.373,-0.042 0.691,-0.289 0.824,-0.64l9.024,-23.904c0.138,-0.366 0.05,-0.78 -0.226,-1.058c-0.276,-0.278 -0.689,-0.369 -1.057,-0.233l-24.004,8.892c-0.353,0.13 -0.602,0.448 -0.646,0.821c-0.044,0.373 0.125,0.74 0.438,0.948l7.973,5.325Z"/>
+                                        <g id="Icon"/>
                                     </svg>
                                 </button>
                             </div>
@@ -195,6 +270,48 @@ pub fn MessageInput(
 }
 
 
+#[derive(Serialize)]
+pub struct CPayload { 
+    pub recipient_id : Uuid, 
+}
+
+
+async fn create_new_conv_id(
+    recipient_id: String,
+    navigate: impl Fn(&str, NavigateOptions) + Clone + 'static,
+    user_uuid: String,
+ )-> Option<Uuid>{
+ 
+        let navigate = navigate.clone();
+ 
+        let url = format!("http://localhost:8000/api/m/nch/{}", user_uuid);
+        let parsed_uuid = Uuid::parse_str(&recipient_id).unwrap_or_else(|_| Uuid::nil());
+        let payload = CPayload { recipient_id: parsed_uuid }; 
+
+        let res = authenticated_fetch(Method::POST, &url, navigate, Some(payload)).await; 
+        
+        match res { 
+            Ok(resp) => {
+                if resp.status().is_success() {
+                    let text = resp.text().await.unwrap_or_default();
+
+                    let new_conv_id = match serde_json::from_str::<Uuid>(&text) {
+                        Ok(parsed) => parsed,
+                        Err(_e) => {
+                            return None;
+                        }
+                    };
+                    Some(new_conv_id)
+                } else {
+                    None                        
+                }
+            }, 
+            Err(_) => {
+                None
+            }, 
+        }
+     
+}
 
 
 

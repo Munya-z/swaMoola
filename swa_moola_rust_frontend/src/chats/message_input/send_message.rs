@@ -13,10 +13,9 @@ use uuid::Uuid;
 use crate::chats::message_encryption::encrypt_files::encrypt_raw_file_bytes;
 use crate::chats::message_encryption::encrypt_files::upload_encrypted_file_to_storage;
 use crate::chats::message_encryption::encrypt_message_payload::prepare_full_payload;
-use crate::chats::models::{ SecretInnerPayload, AttachmentMeta};
+use crate::chats::models::{ SecretInnerPayload, AttachmentMeta, SearchResult};
 use crate::chats::models::InboundMessagePayload;
 use crate::chats::message_input::compresion::{convert_to_clean_webp_bytes, convert_to_compressed_audio_bytes};
-
 
 pub fn generate_random_32_bytes() -> [u8; 32] {
     let mut rng = rand::thread_rng();
@@ -25,10 +24,25 @@ pub fn generate_random_32_bytes() -> [u8; 32] {
     key
 }
 
+pub fn clear_disc_search_result()-> Result<Option<SearchResult>, wasm_bindgen::JsValue>{
+    let storage = web_sys::window()
+        .and_then(|w| w.session_storage().ok())
+        .flatten()
+        .ok_or_else(|| wasm_bindgen::JsValue::from_str("Session storage is not available"))?;
+    if let Some(json_string) = storage.get_item("search_result")? {
+        let _ =storage.remove_item("search_result");
+        let result: SearchResult = serde_json::from_str(&json_string)
+            .map_err(|e| wasm_bindgen::JsValue::from_str(&e.to_string()))?;
+        return Ok(Some(result));
+    }
+    Ok(None)
+}
+
 pub fn send_message(
     user_uuid: String,
+    user_name: String,
     sender_uuid: Uuid,
-    recipient_id: Uuid,
+    conv_id: Uuid,
     content: ReadSignal<String>,
     set_content: WriteSignal<String>,
     is_recipient: bool,
@@ -50,6 +64,8 @@ pub fn send_message(
         return;
     }
 
+    _=clear_disc_search_result();
+
     let text_content = if raw_content.trim().is_empty() {
         if !raw_files.is_empty() {
             " ".to_string() 
@@ -57,7 +73,7 @@ pub fn send_message(
             "".to_string()
         }
     } else {
-        content.get()
+        raw_content
     };
 
     let navigate = navigate.clone();
@@ -116,6 +132,7 @@ pub fn send_message(
     
 
         let inner_data = SecretInnerPayload {
+            sender_name: user_name,
             sender_id: sender_uuid,
             timestamp_ms: Utc::now(),
             text_message: text_content,
@@ -127,11 +144,11 @@ pub fn send_message(
             s_x25519, 
             s_mlkem,
             recipients,
-            recipient_id
+            conv_id
         );
 
         let form = Form::new()
-            .text("recipient_id", recipient_id.to_string())    
+            .text("conv_id", conv_id.to_string())    
             .text("ciphertext", final_payload.ciphertext)
             .text("nonce", final_payload.nonce)
             .text("envelopes", serde_json::to_string(&final_payload.envelopes).unwrap());
@@ -146,18 +163,27 @@ pub fn send_message(
                     set_content.set(String::new());
                     set_files.set(Vec::new());
 
-                    if is_recipient {
-                        let text = resp.text().await.unwrap_or_default();
-                        if let Ok(data) = serde_json::from_str::<InboundMessagePayload>(&text) {
-                            let next_url = format!("/chats/{}", data.conv_id);
-                            request_animation_frame(move || {
-                                navigate(&next_url, Default::default());
-                            });
-                        } else {
-                            on_success.run(());
+                    if is_recipient {                      
+                        match resp.text().await {
+                            Ok(text) => {
+                                if let Ok(data) = serde_json::from_str::<InboundMessagePayload>(&text) {
+                                    let next_url = format!("/chats/{}", data.conv_id);
+                                    
+                                    let navigate_clone = navigate.clone();
+                                    request_animation_frame(move || {
+                                        navigate_clone(&next_url, Default::default());
+                                    });
+                                } else {
+                                    on_success.run(());
+                                }
+                            }
+                            Err(err) => {
+                                error_msg.set(Some(format!("Failed to read server response: {}", err)));
+                            }
                         }
+                    } else {
+                        on_success.run(());
                     }
-                    on_success.run(());
                 } else {
                     error_msg.set(Some(format!("Server returned error status: {}", resp.status())));
                 }
@@ -168,3 +194,5 @@ pub fn send_message(
         }
     }) 
 }
+
+

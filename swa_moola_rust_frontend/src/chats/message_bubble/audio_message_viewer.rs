@@ -136,23 +136,28 @@ pub fn SecureAudio(
 
                 <div class="flex items-center gap-4 bg-transparent p-3  w-72 shadow-lg max-w-full">
                     <button 
-                        class="flex items-center justify-center w-10 h-10 rounded-full bg-transparent hover:bg-slate-600 active:scale-95 text-white font-bold text-lg cursor-pointer disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed disabled:scale-100 transition-all" 
+                        class="flex items-center justify-center w-10 h-10 rounded-full bg-transparent active:scale-95 text-white font-bold text-lg cursor-pointer disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed disabled:scale-100 transition-all" 
                         on:click=toggle_play 
                         disabled={move || audio_src.get().is_none()}
                     >
                         {move || match (audio_src.get(), is_playing.get()) {
                             (None, _) => view! { <span>"⏳"</span> }.into_any(),
-                            (Some(_), true) => view! { <span>"⏸"</span> }.into_any(),
+                            (Some(_), true) => view! { 
+                                <svg width="800px" height="800px" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M7 1H2V15H7V1Z" fill="#000000"/>
+                                    <path d="M14 1H9V15H14V1Z" fill="#000000"/>
+                                </svg> 
+                                }.into_any(),
                             (Some(_), false) => view!{
-                                <svg width="2rem" height="2rem" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--twemoji" preserveAspectRatio="xMidYMid meet">
-                                    <path fill="#3B88C3" d="M36 32a4 4 0 0 1-4 4H4a4 4 0 0 1-4-4V4a4 4 0 0 1 4-4h28a4 4 0 0 1 4 4v28z"></path>
-                                    <path fill="#FFF" d="M8 7l22 11L8 29z"></path>
-                                </svg>}.into_any(),
+                                <svg width="800px" height="800px" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path fill-rule="evenodd" clip-rule="evenodd" d="M8 16C12.4183 16 16 12.4183 16 8C16 3.58172 12.4183 0 8 0C3.58172 0 0 3.58172 0 8C0 12.4183 3.58172 16 8 16ZM7.5 5H6.5V11H7.5L11 8L7.5 5Z" fill="#000000"/>
+                                </svg>
+                                }.into_any(),
                         }}
                     </button>
                     
                     <div class="flex-1 flex flex-col gap-1 min-w-0">
-                        <div class="w-full h-1.5 bg-neutral-700 rounded-full overflow-hidden">
+                        <div class="w-full h-1.5 bg-white rounded-full overflow-hidden">
                             <div class="h-full bg-black transition-all duration-100" 
                             style:width=move || format!("{}%", progress_percent())
                             ></div>

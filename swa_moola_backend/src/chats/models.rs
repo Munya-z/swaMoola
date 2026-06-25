@@ -19,6 +19,12 @@ pub struct ConversationParticipant {
     pub user_id: Uuid,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)] 
+pub struct UserPublicKeys {
+    pub x25519: String,
+    pub mlkem: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ConversationResult {
     pub conv_id: Uuid,
@@ -27,10 +33,10 @@ pub struct ConversationResult {
     pub name: String,
     pub display_name: Option<String>,
     pub recipient_id: Option<Uuid>, 
-    pub pq_public: Option<String>,
-    pub x_public: Option<String>,
+    pub recipient_keys: Vec<UserPublicKeys>,
     pub last_message_id : Option<Uuid>,
 }
+
 
 #[derive(Serialize, Deserialize, sqlx::FromRow, Clone, Debug)] 
 pub struct Message {
@@ -76,7 +82,7 @@ pub struct AddParticipantPayload {
 pub struct GroupPayload{
     pub name: String,
     pub conv_id: Uuid,
-    pub other_user_id: Uuid
+    pub other_user_ids: Vec<Uuid>
 }
 
 #[derive(Debug,Clone , Deserialize)]

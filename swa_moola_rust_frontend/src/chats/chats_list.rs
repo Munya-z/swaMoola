@@ -1,13 +1,12 @@
-use leptos::ev;
 use leptos::prelude::*; 
 use crate::interceptor::authenticated_fetch; 
 use leptos_router::hooks::use_navigate; 
 use leptos::serde_json; 
 use reqwest::Method;  
-// use web_sys::window;
 use uuid::Uuid;
 use crate::auth::models::AuthenticatedUser; 
-use crate::chats::models::{ConversationPayload, ChatPayload, SearchPayload, SearchResult};
+use crate::chats::search_user::SearchUser;
+use crate::chats::models::{ ConversationPayloadWithStringKeys, ChatPayload, ConversationListPayload};
 use chrono::{DateTime, Utc, Datelike};
 
 fn _format_chat_time(dt: &DateTime<Utc>) -> String {
@@ -25,13 +24,13 @@ fn _format_chat_time(dt: &DateTime<Utc>) -> String {
 }
 
 #[component]
-fn ChatItem(chat: ConversationPayload, user_uuid: String) -> impl IntoView {
+fn ChatItem(chat: ConversationListPayload, user_uuid: String) -> impl IntoView {
     let navigate = use_navigate();
     let conv_id_str = chat.conv_id.to_string();
     let redirect_conv_id = chat.conv_id;
 
     let navigate_for_resource = navigate.clone();
-    
+
     let chat_name_resource = LocalResource::new(move || {
         let navigate = navigate_for_resource.clone();
         let user_uuid = user_uuid.clone();
@@ -45,13 +44,28 @@ fn ChatItem(chat: ConversationPayload, user_uuid: String) -> impl IntoView {
         async move { 
             let res: Result<reqwest::Response, reqwest::Error> = 
                 authenticated_fetch(Method::POST, &url, navigate.clone(), Some(payload)).await; 
-            
-            match res { 
-                Ok(resp) => {
-                    let status = resp.status();
+                match res { 
+                    Ok(resp) => {
+                        let status = resp.status();
+                        log::info!("this chat item resp wqorked with status {:?}", &status);
                     if status.is_success() {
-                        let text =  resp.text().await.unwrap_or_default();
-                        serde_json::from_str::<ConversationPayload>(&text).ok()
+                       let text = resp.text().await.unwrap_or_default();
+
+                        if let Ok(data) = serde_json::from_str::<ConversationPayloadWithStringKeys>(&text) {
+
+                            // let converted_keys: Vec<UserPublicKeys> = data.recipient_keys
+                            //     .iter()
+                            //     .map(|key_string| {
+                            //         UserPublicKeys::new(
+                            //             Some(&key_string.x25519), 
+                            //             Some(&key_string.mlkem)
+                            //         )
+                            //     })
+                            //     .collect();
+
+                            return Some(data); 
+                        }
+                        None
                     } else {
                         None                        
                     }
@@ -104,7 +118,6 @@ fn ChatItem(chat: ConversationPayload, user_uuid: String) -> impl IntoView {
 
 #[component]
 pub fn ChatsList( 
-    
 ) -> impl IntoView { 
     let navigate = use_navigate(); 
     let user = window() 
@@ -116,110 +129,55 @@ pub fn ChatsList(
     
     let user_uuid = user.as_ref().map(|u| u.uuid.to_string()).unwrap_or_default();
     let user_uuid_clone = user_uuid.clone();
-    let user_uuid_for_search = user_uuid.clone();
-    let value = navigate.clone();
-    let value_for_search = navigate.clone();
 
-    let chats_resource : LocalResource<Option<Vec<ConversationPayload>>> = LocalResource::new(move || { 
+    let value = navigate.clone();
+
+    let chats_resource : LocalResource<Option<Vec<ConversationListPayload>>> = LocalResource::new(move || { 
         let navigate = value.clone(); 
         let url = format!("http://localhost:8000/api/m/conversations/{}", user_uuid); 
         
         async move { 
             let res: Result<reqwest::Response, reqwest::Error> = 
                 authenticated_fetch(Method::GET, &url, navigate.clone(), None::<()>).await; 
-            
-            match res { 
-                Ok(resp) => resp.json::<Vec<ConversationPayload>>().await.ok(), 
-                Err(_) => None, 
-            } 
+                
+                
+                match res { 
+                    Ok(resp) =>{
+                    log::info!("The response status inside chats_resource: {:?}", &resp.status());
+                    if resp.status().is_success() {
+                        let text = resp.text().await.unwrap_or_default();
+                        log::info!("Raw JSON text received: {}", text);
+         
+                        match serde_json::from_str::<Vec<ConversationListPayload>>(&text) {
+                            Ok(conversations) => Some(conversations),
+                            Err(parse_err) => {
+                                log::error!("JSON Deserialization failed: {}", parse_err);
+                                None
+                            }
+                        }
+                    }else {
+                        log::error!("Server returned error status code: {}", resp.status());
+                        None
+                    }
+                }
+                Err(e) => {
+                    log::error!("Network fetch failed: {}", e);
+                    None
+                } 
+            }
+                
         } 
     }); 
 
-    let (search_result, set_search_result) = signal(Option::<SearchResult>::None);
-    let (search_content, set_search_content) = signal(String::new());
-    let (_error_msg, set_error_msg) = signal(Option::<String>::None);
-
-    let on_search_submit = move |ev: ev::SubmitEvent| {
-        ev.prevent_default();
-        set_error_msg.set(None);
-
-        if search_content.get().trim().is_empty() {
-            set_error_msg.set(Some("search cannot be empty.".to_string()));
-            return;
-        }
-
-        let navigate = navigate.clone();
-        let content = search_content.get().trim().to_string();
-        let payload = SearchPayload {
-            key: content.clone(),
-        };
-        let url = format!("http://localhost:8000/api/uu/sk/{}", user_uuid_for_search);
-
-         leptos::task::spawn_local( async move { 
-            let res: Result<reqwest::Response, reqwest::Error> = 
-                authenticated_fetch(Method::POST, &url, navigate.clone(), Some(payload)).await; 
-            
-            match res { 
-                Ok(resp) => {
-                    if resp.status().is_success() {
-                        // Clear the input field on successful transmission
-                        let text = resp.text().await.unwrap_or_default();
-                        if let Ok(parsed_user) = serde_json::from_str::<SearchResult>(&text) {
-                            // Save the profile metadata to state
-                            set_search_result.set(Some(parsed_user)); 
-                            set_search_content.set(String::new());
-                        }
-                        } else {
-                            set_error_msg.set(Some(format!("Server returned: {}", resp.status())));
-                        }
-                }, 
-                Err(e) => {
-                    set_error_msg.set(Some(format!("Network error: {}", e)));
-                }, 
-            }
-        }) 
-    }; 
-
-
     view! { 
         <div class="max-w-[600px] w-full p-4"> 
-        <form class=" flex items-start p-4 mb-4" on:submit=on_search_submit> 
-            <input type="text" 
-                   id="search"
-                   placeholder="Search or start new chat" 
-                   prop:value=search_content 
-                   on:input=move |ev| set_search_content.set(event_target_value(&ev)) 
-                   class="flex-1 px-4 py-2 rounded-full bg-[#f0f2f5] focus:outline-none focus:ring-2 focus:ring-[#00a884]"/>
-            <button type="submit" class="ml-2 px-4 py-2 bg-[#00a884] text-white rounded-full hover:bg-[#008f6b] transition-colors">"find"</button>
-        </form>
-
-        <Suspense fallback=|| view! { <p>"searched chats would go here..."</p> }> 
-            {move || { 
-                search_result.get().map(|data: SearchResult| { 
-                    let navigate = value_for_search.clone();
-                    let target_id = data.target_user_id.clone(); 
-                    _=save_search_result(&data);
-                    view! { 
-                            <ul  class=" px-4 mt-4 w-full bg-white font-sans "> 
-                                <li on:click={
-                                        
-                                        move |_| {
-                                            let target_url = format!("/chats/c/{}", target_id);
-                                            navigate(&target_url, Default::default());
-                                        }
-                                    }
-                                >{data.name}</li>
-                                                         
-                            </ul> 
-                        }
-                    }) 
-                } 
-            } 
-        </Suspense>
-    
+        
+        <SearchUser/>
+                
         <Suspense fallback=|| view! { <p>"Loading chats..."</p> }> 
             {move || { 
-                chats_resource.get().map(|data: Option<Vec<ConversationPayload>>| { 
+                chats_resource.get().map(|data: Option<Vec<ConversationListPayload>>| { 
+                    log::info!("chat resource data : {:?}", &data);
                     match data { 
                         Some(chats) => view! { 
                             <ul  class="max-w-[600px] w-full bg-white font-sans "> 
@@ -240,22 +198,4 @@ pub fn ChatsList(
 }
 
 
-pub fn save_search_result(result: &SearchResult) -> Result<(), wasm_bindgen::JsValue> {
-
-    // Get session storage
-    let storage = web_sys::window()
-        .and_then(|w| w.session_storage().ok())
-        .flatten()
-        .ok_or_else(|| wasm_bindgen::JsValue::from_str("Session storage is not available"))?; 
-    
-    
-    // Turn the struct into a JSON string
-    let json_string = serde_json::to_string(result)
-        .map_err(|e| wasm_bindgen::JsValue::from_str(&e.to_string()))?;
-    
-    // Save it with the key "search_result"
-    storage.set_item("search_result", &json_string)?;
-    
-    Ok(())
-}
 

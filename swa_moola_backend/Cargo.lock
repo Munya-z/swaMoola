@@ -1920,6 +1920,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_arrays"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94a16b99c5ea4fe3daccd14853ad260ec00ea043b2708d1fd1da3106dcd8d9df"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2335,6 +2344,7 @@ dependencies = [
  "rand 0.8.6",
  "rust_decimal",
  "serde",
+ "serde_arrays",
  "serde_json",
  "sha2 0.11.0",
  "sqlx",

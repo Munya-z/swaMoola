@@ -17,7 +17,6 @@ pub struct ChatPayload {
 
 #[derive(Serialize, Deserialize, Clone, Debug,  PartialEq)]
 pub struct Attachment {
-    // pub attachment_id: uuid::Uuid,
     pub file_name: String,
     pub file_size: i32,
     pub file_type: String,
@@ -36,36 +35,27 @@ pub struct AttachmentMeta {
     pub nonce_base: String,
 }
 
-#[derive(Debug, Clone,Serialize, Deserialize)] 
-pub struct Message {
-    pub msg_id: Uuid,
-    pub conv_id: Uuid,
-    pub sender_id: Uuid,
-    pub content: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub attachments: Vec<Attachment>,
-}
+// #[derive(Debug, Clone,Serialize, Deserialize)] 
+// pub struct Message {
+//     pub msg_id: Uuid,
+//     pub conv_id: Uuid,
+//     pub sender_id: Uuid,
+//     pub content: Option<String>,
+//     pub created_at: DateTime<Utc>,
+//     pub attachments: Vec<Attachment>,
+// }
 
 #[derive(Debug, Clone,Serialize, Deserialize)] 
 pub struct SearchResult {
     pub target_user_id: Uuid,
     pub name: String,
-    pub x_public: String,
-    pub pq_public: String,
+    pub recipient_keys: Vec<UserPublicKeyStrings>
 }
 
-#[derive(Debug,Clone , Deserialize, Serialize)] 
-pub struct ConversationPayload {
-    pub conv_id: Uuid,
-    pub is_group: bool,
-    pub created_at: DateTime<Utc>,
-    pub name: String,
-    pub display_name: Option<String>,
-    pub recipient_id: Option<Uuid>, 
-    pub x_public: Option<String>,
-    pub pq_public: Option<String>,
-    pub last_msg_id: Option<Uuid>,
-    
+
+pub enum ChatTarget {
+    NewChat { recipient_id: Uuid },
+    ExistingChat { conv_id: Uuid },
 }
 
 #[derive(Debug,Clone , Deserialize, Serialize)] 
@@ -76,6 +66,7 @@ pub struct SearchPayload {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SecretInnerPayload {
     pub sender_id: Uuid,
+    pub sender_name: String,
     pub timestamp_ms: DateTime<Utc>, 
     pub text_message: String,
     pub attachments: Vec<AttachmentMeta>, 
@@ -83,7 +74,7 @@ pub struct SecretInnerPayload {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OutboundMessagePayload {
-    pub recipient_id: Uuid,
+    pub conv_id: Uuid,
     pub ciphertext: String,       
     pub nonce: String,            
     pub envelopes: Vec<Envelope>,
@@ -96,7 +87,6 @@ pub struct InboundMessagePayload {
     pub ciphertext: String,
     pub nonce: String,
     pub envelopes: Vec<Envelope>, 
-    pub created_at: DateTime<Utc>,
 }
 
 
@@ -107,9 +97,55 @@ pub struct Envelope {
     pub encrypted_master_key: String,    
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug,Clone , Deserialize, Serialize)] 
+pub struct ConversationPayload {
+    pub conv_id: Uuid,
+    pub is_group: bool,
+    pub created_at: DateTime<Utc>,
+    pub name: String,
+    pub display_name: Option<String>,
+    pub recipient_id: Option<Uuid>, 
+    pub recipient_keys: Vec<UserPublicKeys>,
+    pub last_msg_id: Option<Uuid>,
+    
+}
+
+#[derive(Debug,Clone , Deserialize, Serialize)] 
+pub struct ConversationPayloadWithStringKeys {
+    pub conv_id: Uuid,
+    pub is_group: bool,
+    pub created_at: DateTime<Utc>,
+    pub name: String,
+    pub display_name: Option<String>,
+    pub recipient_id: Option<Uuid>, 
+    pub recipient_keys: Vec<UserPublicKeyStrings>,
+    pub last_msg_id: Option<Uuid>,
+    
+}
+
+#[derive(Debug,Clone , Deserialize, Serialize)] 
+pub struct ConversationListPayload {
+    pub conv_id: Uuid,
+    pub is_group: bool,
+    pub created_at: DateTime<Utc>,
+    pub name: String,
+    pub display_name: Option<String>,
+    pub recipient_id: Option<Uuid>, 
+    pub last_msg_id: Option<Uuid>,
+    
+}
+
+
+#[derive(Debug, Clone,  Deserialize, Serialize)]
+pub struct UserPublicKeyStrings {
+    pub x25519: String,
+    pub mlkem: String,
+}
+
+#[derive(Debug, Clone,  Deserialize, Serialize)]
 pub struct UserPublicKeys {
     pub x25519: [u8; 32],
+    #[serde(with = "serde_bytes")]
     pub mlkem: [u8; 1184],
 }
 

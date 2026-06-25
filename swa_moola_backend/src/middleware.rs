@@ -15,7 +15,10 @@ struct Claims {
 }
 
 pub fn validate_token_and_get_id(token: &str) -> anyhow::Result<Uuid> {
-    let secret = std::env::var("JWT_SECRET_KEY").expect("JWT_SECRET_KEY must be set");
+    // let secret = std::env::var("JWT_SECRET_KEY").expect("JWT_SECRET_KEY must be set");
+    let secret = std::env::var("JWT_SECRET_KEY")
+        .map_err(|_| anyhow::anyhow!("JWT_SECRET_KEY environment variable is missing"))?;
+
 
      match decode::<Claims>(
         token,
@@ -42,12 +45,14 @@ pub async fn auth_middleware(
     if req.method() == axum::http::Method::OPTIONS {
         return Ok(next.run(req).await);
     }
+    println!("after i do request method of Options");
 
     let auth_header = req.headers()
         .get(header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
         .filter(|h| h.starts_with("Bearer "))
         .map(|h| &h[7..]); 
+    println!("after auth header ");
 
     let token = auth_header.ok_or(StatusCode::UNAUTHORIZED)?;
 
@@ -56,9 +61,16 @@ pub async fn auth_middleware(
         println!("Error validating token: {}", err_msg);
 
         if err_msg == "TOKEN_EXPIRED" {
+            println!("error from err_msg = token expired");
             return StatusCode::UNAUTHORIZED; 
         }
-        
+
+        if err_msg.contains("JWT_SECRET_KEY") {
+            println!("error from err_msg.contains(JWT_SECRET_KEY)");
+            return StatusCode::INTERNAL_SERVER_ERROR; // Tells you the server configuration is broken
+        }
+
+        println!("error validate_token_and_get_id");    
         StatusCode::UNAUTHORIZED
     })?;
 

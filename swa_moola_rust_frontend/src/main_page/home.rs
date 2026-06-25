@@ -21,7 +21,7 @@ pub fn change_discoverable_key(on_success: impl Fn() + 'static){
 
     log::info!("this funtion is working and has started");
 
-    let mut user = get_local_user();
+    let user = get_local_user();
 
     let user_uuid = user.as_ref().map(|u| u.uuid.to_string()).unwrap_or_default();
     let url :String =  format!("http://localhost:8000/api/uu/dk/{}", user_uuid );

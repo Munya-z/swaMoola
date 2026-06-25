@@ -67,6 +67,12 @@ pub struct DiscoverableSearchRequest {
 pub struct DiscoverableSearchResponse {
     pub target_user_id: Uuid,
     pub name: String,
-    pub x_public: String,
-    pub pq_public: String,
+    pub recipient_keys: Vec<UserPublicKeys>,
 }
+//  allows users to search fot others by their discoverable key, returning minimal info needed to request a connection if found
+#[derive(Debug, Clone, Serialize, Deserialize)] 
+pub struct UserPublicKeys {
+    pub x25519: String,
+    pub mlkem: String,
+}
+

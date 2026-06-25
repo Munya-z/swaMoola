@@ -60,7 +60,7 @@ pub fn prepare_full_payload(
     sender_x25519: [u8; 32],       
     sender_mlkem: [u8; 1184],      
     recipients: Vec<UserPublicKeys>, 
-    recipient_id: Uuid,
+    conv_id: Uuid,
 ) -> OutboundMessagePayload {
 
     let mut rng = rand::thread_rng();
@@ -91,7 +91,7 @@ pub fn prepare_full_payload(
     chat_envelopes.push(sender_envelope);
     
     OutboundMessagePayload {
-        recipient_id,
+        conv_id,
         ciphertext: STANDARD.encode(encrypted_bytes),
         nonce: STANDARD.encode(msg_nonce_bytes),
         envelopes: chat_envelopes,

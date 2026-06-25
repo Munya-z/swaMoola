@@ -8,7 +8,7 @@ use chrono::{Utc, Duration};
 use rand::Rng;
 use argon2::{password_hash::{rand_core::OsRng, PasswordHasher, SaltString},Argon2, PasswordHash, PasswordVerifier};
 
-use crate::users::models::{AuthResponse, AuthenticatedUser, LoginRequest, RegisterRequest, User, UserResponse, DiscoverableSearchRequest , DiscoverableSearchResponse};
+use crate::users::models::{AuthResponse, UserPublicKeys, AuthenticatedUser, LoginRequest, RegisterRequest, User, UserResponse, DiscoverableSearchRequest , DiscoverableSearchResponse};
 
 // Create a user into the database, hashing the password and phone number appropriately
 async fn create_user(
@@ -160,7 +160,7 @@ pub async fn login_handler(
     Ok(Json(AuthResponse { token, user }))
 }
 
-//  allows users to search fot others by their discoverable key, returning minimal info needed to request a connection if found
+
 pub async fn search_by_discoverable_key(
     State(pool): State<PgPool>,
     Json(payload): Json<DiscoverableSearchRequest>,
@@ -170,6 +170,8 @@ pub async fn search_by_discoverable_key(
         return Err((StatusCode::BAD_REQUEST, "Invalid key format".to_string()));
     }
 
+    
+
     let result = sqlx::query!(
         "SELECT id, name, x_public, pq_public FROM users WHERE discoverable_key = $1",
         payload.key
@@ -177,13 +179,20 @@ pub async fn search_by_discoverable_key(
     .fetch_optional(&pool)
     .await;
 
+    println!("serch by key is working even after data base fetch");
+
     match result {
         Ok(Some(user)) => {
+  
+            println!("serch by key is working got the result before the response {:?}", &user);
+
             Ok(Json(DiscoverableSearchResponse {
                 target_user_id: user.id,
                 name: user.name,
-                x_public: user.x_public,
-                pq_public: user.pq_public,
+                recipient_keys:vec![ UserPublicKeys{
+                   x25519: user.x_public, 
+                   mlkem: user.pq_public,
+                }]                 
             }))
         }
         Ok(None) => {

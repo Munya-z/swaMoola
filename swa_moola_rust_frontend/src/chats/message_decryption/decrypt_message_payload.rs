@@ -8,9 +8,7 @@ use std::{error::Error};
 use crate::chats::models::{SecretInnerPayload, Envelope};
 use sha2::Sha256;
 use sha2::Digest;
-
 use crate::chats::models::InboundMessagePayload;
-
 
 pub fn decrypt_message_with_fallback(
     payload: &InboundMessagePayload,

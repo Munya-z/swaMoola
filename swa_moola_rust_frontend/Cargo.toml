@@ -8,6 +8,7 @@ leptos = { version = "0.8.19", features = ["csr", "hydrate"] }
 leptos_router = { version = "0.8.13"}
 leptos-use = { version = "0.18.3", features = ["storage"] }
 serde = { version = "1", features = ["derive"]}
+serde_bytes = "0.11"
 uuid =  { version = "1.23.0", features = ["v4", "serde", "js"] }
 reqwest =  { version = "0.13.4", features = ["json", "multipart"] }
 log = "0.4.32"

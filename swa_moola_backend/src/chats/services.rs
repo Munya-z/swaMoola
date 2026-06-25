@@ -57,6 +57,8 @@ pub async fn get_user_conversations(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
+    println!("this get user conversations is working");
+
     let query = sqlx::query_as!(
         Conversation,r#"
             SELECT c.conv_id as "conv_id!", 
@@ -77,10 +79,13 @@ pub async fn get_user_conversations(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
+    println!("this get user conversations is working and conversations were found, {:?}", conversations);
+
     tx.commit().await.map_err(|e: sqlx::Error| {
         println!("Database query error: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+    println!("this get user conversations is working and about to send data back");
 
     Ok(Json(conversations))
     
