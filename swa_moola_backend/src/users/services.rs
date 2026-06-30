@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::db::begin_rls_txn;
 use crate::users::models::{ UserResponse};
+use crate::AppState;
 
 #[derive(Deserialize)]
 pub struct ScoreUpdate {
@@ -25,12 +26,12 @@ pub enum TransactionUpdateOption {
 }
 
 pub async fn update_user_trust_score(
-    State(pool): State<PgPool>,
+    State(pool): State<AppState>,
     Path(user_id): Path<Uuid>,
     Json(payload): Json<ScoreUpdate>
 ) -> Result<(StatusCode, Json<UserResponse>), StatusCode>{
     
-    let mut tx = begin_rls_txn(&pool, user_id)
+    let mut tx = begin_rls_txn(&pool.db, user_id)
     .await
     .map_err(|e| {
         println!("error from beginning transaction in update user trust score : {}", e);
@@ -55,12 +56,12 @@ pub async fn update_user_trust_score(
 } 
 
 pub async fn update_user_active_transactions(
-    State(pool): State<PgPool>,
+    State(pool): State<AppState>,
     Path(user_id): Path<Uuid>,
     Json(payload) : Json<TransactionUpdate>
 ) -> Result<(StatusCode, Json<UserResponse>), StatusCode>{
     
-    let mut tx = begin_rls_txn(&pool, user_id)
+    let mut tx = begin_rls_txn(&pool.db, user_id)
     .await
     .map_err(|e| {
         println!("error from beginning transaction in update user active transactions : {}", e);

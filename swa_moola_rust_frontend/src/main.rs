@@ -1,18 +1,27 @@
 use leptos::prelude::*;
 use leptos_router::components::*;
 use leptos_router::path;
+use crate::chats::ws_hooks::CallState;
 
 mod interceptor;
 mod auth;
 mod main_page;
 mod auth_state; 
 mod chats;
-
-use chats::{chats_list::ChatsList, open_chat::OpenChat};
+use crate::chats::calls::SignalingMessage;
+use chats::{chats_list::ChatsList, open_chat::OpenChat, calls::WebRtcCall};
 use auth::login_ui::LoginComponent;
 use auth::register_ui::RegisterComponent;
 use main_page::home::Home;
 use auth_state::AuthState; 
+use leptos::serde_json;
+use crate::auth::models::AuthenticatedUser;
+use crate::chats::ws_hooks::use_websocket_listener;
+use crate::chats::calls::IncomingCallModal;
+
+
+#[derive(Clone)]
+pub struct IncomingSignalStream(pub ReadSignal<Option<SignalingMessage>>);
 
 
 #[component]
@@ -24,11 +33,25 @@ pub fn App() -> impl IntoView {
         .and_then(|storage| storage.get_item("auth_token").ok().flatten());
 
     let auth_state = RwSignal::new(AuthState { token: initial_token });
-    
-    // Provide this signal to all child components
     provide_context(auth_state);
 
+    let (global_message_read, global_message_write) = signal(0);
+    provide_context(global_message_write);
+    
+    let user =  window() 
+        .local_storage() 
+        .ok()
+        .flatten()
+        .and_then(|s| s.get_item("auth_user").ok().flatten()) 
+        .and_then(|json| serde_json::from_str::<AuthenticatedUser>(&json).ok());
+
+    let user_id = user.as_ref().map(|u| u.uuid.to_string()).unwrap_or_default();
+    use_websocket_listener(user_id);
+    
     view! {
+
+        <IncomingCallModal />
+
         <Router>
             <nav class="px-10 fixed top-0 left-0 w-full h-16 bg-white shadow-md z-50 flex items-center justify-end gap-2 ">
                 <A href="/" exact=true attr:class="aria-[current=page]:underline" >"Home"</A>
@@ -57,6 +80,8 @@ pub fn App() -> impl IntoView {
                     // Dynamic parameters
                     <Route path=path!("/chats/:id") view=OpenChat/>
                     <Route path=path!("/chats/c/:id") view=OpenChat/>
+                    <Route path=path!("/make_call/:id") view=WebRtcCall/>
+
                 </Routes>
             </main>
         </Router>

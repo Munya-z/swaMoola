@@ -5,6 +5,7 @@ use crate::chats::models::{DbEnvelope, EncryptedMessagePayload};
 use crate::db::begin_rls_txn;
 use crate::chats::models::{Message};
 use crate::chats::conversation_handlers::{ add_last_message_to_conversation};
+use crate::AppState;
 
 async fn add_message_to_db(
     executor: &mut sqlx::PgConnection, 
@@ -41,10 +42,13 @@ async fn add_message_to_db(
 }
 
 pub async fn send_message(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
     mut multipart: Multipart, 
 ) -> impl IntoResponse {
+
+    let pool = state.db;
+
     let mut conv_id = None;
 
     let mut ciphertext = None;

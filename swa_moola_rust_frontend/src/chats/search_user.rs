@@ -43,7 +43,10 @@ pub fn SearchUser(
             key: content.clone(),
         };
         log::info!("im still going forward YeePy ");
-        let url = format!("http://localhost:8000/api/uu/sk/{}", user_uuid_for_search);
+        let _ = dotenvy::dotenv();
+        let base_url = std::env::var("BACKEND_WS_URL")
+        .unwrap_or_else(|_| "http://localhost:8000".to_string());  
+        let url = format!("{base_url}/api/uu/sk/{}", user_uuid_for_search);
 
         
          leptos::task::spawn_local( async move { 

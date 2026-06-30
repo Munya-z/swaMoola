@@ -9,6 +9,7 @@ use rand::Rng;
 use argon2::{password_hash::{rand_core::OsRng, PasswordHasher, SaltString},Argon2, PasswordHash, PasswordVerifier};
 
 use crate::users::models::{AuthResponse, UserPublicKeys, AuthenticatedUser, LoginRequest, RegisterRequest, User, UserResponse, DiscoverableSearchRequest , DiscoverableSearchResponse};
+use crate::models::AppState;
 
 // Create a user into the database, hashing the password and phone number appropriately
 async fn create_user(
@@ -65,10 +66,10 @@ async fn create_user(
 
 // Handler for user registration endpoint
 pub async fn register_user(
-    State(pool): State<PgPool>,
+    State(pool): State<AppState>,
     Json(payload): Json<RegisterRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let user = create_user(&pool, payload.name, payload.phone_number, payload.password, payload.x_public, payload.pq_public)
+    let user = create_user(&pool.db, payload.name, payload.phone_number, payload.password, payload.x_public, payload.pq_public)
         .await
         .map_err(|e| {
             println!("error from creating uuid : {}", e);
@@ -141,11 +142,11 @@ pub fn generate_token(user: &AuthenticatedUser, secret: &str) -> anyhow::Result<
 
 // handles login requests, verifying credentials and returning a JWT token and user data if successful
 pub async fn login_handler(
-    State(pool): State<PgPool>,
+    State(pool): State<AppState>,
     Json(payload): Json<LoginRequest>, 
 ) -> Result<Json<AuthResponse>, StatusCode> {
 
-    let user = verify_user(&pool, &payload.phone_number, &payload.password)
+    let user = verify_user(&pool.db, &payload.phone_number, &payload.password)
         .await
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
@@ -162,7 +163,7 @@ pub async fn login_handler(
 
 
 pub async fn search_by_discoverable_key(
-    State(pool): State<PgPool>,
+    State(pool): State<AppState>,
     Json(payload): Json<DiscoverableSearchRequest>,
 ) -> Result<Json<DiscoverableSearchResponse>, (StatusCode, String)> {
 
@@ -176,7 +177,7 @@ pub async fn search_by_discoverable_key(
         "SELECT id, name, x_public, pq_public FROM users WHERE discoverable_key = $1",
         payload.key
     )
-    .fetch_optional(&pool)
+    .fetch_optional(&pool.db)
     .await;
 
     println!("serch by key is working even after data base fetch");
@@ -221,7 +222,7 @@ pub fn generate_discoverable_key() -> String {
 
 // used to refresh a user's discoverable key, generating a new one and saving it to the database
 pub async fn refresh_user_key(
-    State(pool): State<PgPool>,
+    State(pool): State<AppState>,
     Path(user_id): Path<Uuid>,
 ) -> impl IntoResponse{
     
@@ -233,7 +234,7 @@ pub async fn refresh_user_key(
         new_key,
         user_id
     )
-    .execute(&pool)
+    .execute(&pool.db)
     .await;
     
 

@@ -1,19 +1,20 @@
 use uuid::Uuid;
-use sqlx::PgPool;
 use axum::{extract::{State,Path}, Json, http::{StatusCode, header, HeaderMap}};
 use axum::{body::Body,response::IntoResponse};
 use tokio_util::io::ReaderStream;
 use crate::chats::models::{Conversation, ConversationParticipant, MessageReturn, ConversationIdPayload, DbEnvelope};
 use crate::db::begin_rls_txn;
+use crate::AppState;
 
 
 // get all the messages belonging to a conversation, given the conversation id and the user id of the requester.
 // This will be used to display the messages in a conversation when a user opens it.
 pub async fn get_conversation_messages(
-    State(pool): State<PgPool>, 
+    State(state): State<AppState>, 
     Path(user_id): Path<Uuid>,
     Json(payload): Json<ConversationIdPayload>
 )-> Result<Json<Vec<MessageReturn>>, StatusCode>{
+    let pool = &state.db;
     let mut tx =begin_rls_txn(&pool, user_id).await.map_err(|_|
     StatusCode::INTERNAL_SERVER_ERROR)?;
     
@@ -49,9 +50,10 @@ pub async fn get_conversation_messages(
 
 //get all the conversations that a user is a part of, given the user id of the requester. This will be used to display the list of conversations in the front 
 pub async fn get_user_conversations(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(user_id): Path<Uuid>
 )-> Result<Json<Vec<Conversation>>, StatusCode>{
+    let pool = &state.db;
     let mut tx = begin_rls_txn(&pool, user_id).await.map_err(|e|{   
         println!("Failed to start transaction: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
@@ -93,10 +95,11 @@ pub async fn get_user_conversations(
 
 // get all the participants of a conversation, given the conversation id and the user id of the requester.
 pub async fn get_conversation_participants(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
     Json(payload): Json<ConversationIdPayload>
 )-> Result<Json<Vec<ConversationParticipant>>, StatusCode>{
+    let pool = &state.db;
     let mut tx = begin_rls_txn(&pool, user_id).await.map_err(|e|{   
         println!("Failed to start transaction: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
@@ -124,10 +127,11 @@ pub async fn get_conversation_participants(
 }
 
 pub async fn download_attachment(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(attachment_id): Path<Uuid>,
 ) -> impl IntoResponse {
    
+    let pool = state.db;
     let record = sqlx::query!(
         "SELECT file_name, storage_url, file_type FROM message_attachments WHERE attachment_id = $1",
         attachment_id

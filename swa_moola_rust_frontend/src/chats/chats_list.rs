@@ -35,7 +35,8 @@ fn ChatItem(chat: ConversationListPayload, user_uuid: String) -> impl IntoView {
         let navigate = navigate_for_resource.clone();
         let user_uuid = user_uuid.clone();
         let conv_id = Uuid::parse_str(&conv_id_str.clone()).unwrap_or_else(|_| Uuid::nil());
-        let url = format!("http://localhost:8000/api/m/ch/{}", user_uuid); 
+        let base_url = option_env!("BACKEND_URL").unwrap_or("http://localhost:8000");   
+        let url = format!("{base_url}/api/m/ch/{}", user_uuid); 
         
         let payload = ChatPayload { 
             conv_id
@@ -47,21 +48,11 @@ fn ChatItem(chat: ConversationListPayload, user_uuid: String) -> impl IntoView {
                 match res { 
                     Ok(resp) => {
                         let status = resp.status();
-                        log::info!("this chat item resp wqorked with status {:?}", &status);
+                    
                     if status.is_success() {
                        let text = resp.text().await.unwrap_or_default();
 
                         if let Ok(data) = serde_json::from_str::<ConversationPayloadWithStringKeys>(&text) {
-
-                            // let converted_keys: Vec<UserPublicKeys> = data.recipient_keys
-                            //     .iter()
-                            //     .map(|key_string| {
-                            //         UserPublicKeys::new(
-                            //             Some(&key_string.x25519), 
-                            //             Some(&key_string.mlkem)
-                            //         )
-                            //     })
-                            //     .collect();
 
                             return Some(data); 
                         }
@@ -134,7 +125,10 @@ pub fn ChatsList(
 
     let chats_resource : LocalResource<Option<Vec<ConversationListPayload>>> = LocalResource::new(move || { 
         let navigate = value.clone(); 
-        let url = format!("http://localhost:8000/api/m/conversations/{}", user_uuid); 
+        let _ = dotenvy::dotenv();
+        let base_url = std::env::var("BACKEND_WS_URL")
+        .unwrap_or_else(|_| "http://localhost:8000".to_string());   
+        let url = format!("{base_url}/api/m/conversations/{}", user_uuid); 
         
         async move { 
             let res: Result<reqwest::Response, reqwest::Error> = 
@@ -143,25 +137,20 @@ pub fn ChatsList(
                 
                 match res { 
                     Ok(resp) =>{
-                    log::info!("The response status inside chats_resource: {:?}", &resp.status());
                     if resp.status().is_success() {
                         let text = resp.text().await.unwrap_or_default();
-                        log::info!("Raw JSON text received: {}", text);
          
                         match serde_json::from_str::<Vec<ConversationListPayload>>(&text) {
                             Ok(conversations) => Some(conversations),
                             Err(parse_err) => {
-                                log::error!("JSON Deserialization failed: {}", parse_err);
                                 None
                             }
                         }
                     }else {
-                        log::error!("Server returned error status code: {}", resp.status());
                         None
                     }
                 }
                 Err(e) => {
-                    log::error!("Network fetch failed: {}", e);
                     None
                 } 
             }
@@ -177,7 +166,7 @@ pub fn ChatsList(
         <Suspense fallback=|| view! { <p>"Loading chats..."</p> }> 
             {move || { 
                 chats_resource.get().map(|data: Option<Vec<ConversationListPayload>>| { 
-                    log::info!("chat resource data : {:?}", &data);
+
                     match data { 
                         Some(chats) => view! { 
                             <ul  class="max-w-[600px] w-full bg-white font-sans "> 

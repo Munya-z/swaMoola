@@ -16,15 +16,19 @@ fn get_local_user() -> Option<AuthenticatedUser> {
 }
 
 pub fn change_discoverable_key(on_success: impl Fn() + 'static){
+
     let navigate = use_navigate();
     let (_error_msg, set_error_msg) = signal(Option::<String>::None);
-
+    
     log::info!("this funtion is working and has started");
-
+    
     let user = get_local_user();
-
+    
     let user_uuid = user.as_ref().map(|u| u.uuid.to_string()).unwrap_or_default();
-    let url :String =  format!("http://localhost:8000/api/uu/dk/{}", user_uuid );
+    let _ = dotenvy::dotenv();
+    let base_url = std::env::var("BACKEND_WS_URL")
+    .unwrap_or_else(|_| "http://localhost:8000".to_string());
+    let url :String =  format!("{base_url}/api/uu/dk/{}", user_uuid );
     let navigate_for_key = navigate.clone();
 
     leptos::task::spawn_local(async move { 

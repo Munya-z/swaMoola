@@ -3,8 +3,8 @@
     <head>
         
 <script type="module">
-import init, * as bindings from '/swa_moola_frontend-787e7ad2c4e3359b.js';
-const wasm = await init({ module_or_path: '/swa_moola_frontend-787e7ad2c4e3359b_bg.wasm' });
+import init, * as bindings from '/swa_moola_frontend-5bfb189b0821d5d0.js';
+const wasm = await init({ module_or_path: '/swa_moola_frontend-5bfb189b0821d5d0_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -13,10 +13,10 @@ window.wasmBindings = bindings;
 dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
 </script>
-        <link rel="stylesheet" href="/tailwind-c85bb6e389a156dc.css" integrity="sha384-qSsek8UP1ZLuMCDB3dji0ky+V6AUwIr/QBLXMfg0E0CnaQsHnUA3VkvV3yXWFKfo"/>
+        <link rel="stylesheet" href="/tailwind-d9e6bf1b1548db11.css" integrity="sha384-3pIZg9bHkxOx4xChzvmpNT2rVWVYUaD+Rh93B67Bn+98AmQMYrhNB7bE+dgz5q08"/>
         <!-- <link data-trunk rel="copy-file" href="public/images/chat_bg.png" data-target-path="images" /> -->
         
-    <link rel="modulepreload" href="/swa_moola_frontend-787e7ad2c4e3359b.js" crossorigin="anonymous" integrity="sha384-nDo7DYDeKciX3RxE/yfoeY0kLz47ZwLOYIOnuQaTNiiZIZ8zmxe0ehzotC2CBdUw"><link rel="preload" href="/swa_moola_frontend-787e7ad2c4e3359b_bg.wasm" crossorigin="anonymous" integrity="sha384-Cg+n1pi4Jw3mDeNRP6HZucVWA2SH5AVqNbrLN7nmcYHSrOwf44gPIgcSG0v0XupI" as="fetch" type="application/wasm"></head>
+    <link rel="modulepreload" href="/swa_moola_frontend-5bfb189b0821d5d0.js" crossorigin="anonymous" integrity="sha384-KijvXGN5TLoBdLrPoiq+fj86+S3Sva7jDHZBWmeizD5HAgCSVB/HrdvYQEiIEU1U"><link rel="preload" href="/swa_moola_frontend-5bfb189b0821d5d0_bg.wasm" crossorigin="anonymous" integrity="sha384-17aJVCMAZWkWLkNbPHF5IxLMuTgAHUjPzNRNyezwvgO3KDUNWU1Q25DDym1tRQtX" as="fetch" type="application/wasm"></head>
     <body><script>"use strict";
 
 (function () {
@@ -147,4 +147,10 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
 })()
 </script></body>
+    <script src="https://jsdelivr.net"></script>
+    <script>
+        window.addEventListener('load', function() {
+                eruda.init();
+            });
+    </script>
 </html>

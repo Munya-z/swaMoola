@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 leptos = { version = "0.8.19", features = ["csr", "hydrate"] }
+dotenvy = "0.15"
 leptos_router = { version = "0.8.13"}
 leptos-use = { version = "0.18.3", features = ["storage"] }
 serde = { version = "1", features = ["derive"]}
@@ -54,7 +55,20 @@ features = [
 "HtmlAudioElement",
 "CanvasRenderingContext2d",
 "AudioContext",
-"AudioBuffer"
+"AudioBuffer",
+"RtcPeerConnection",
+"RtcConfiguration",
+"RtcSessionDescription",
+"RtcSessionDescriptionInit",
+"RtcIceCandidate",
+"RtcIceCandidateInit",
+"HtmlVideoElement",
+"RtcPeerConnectionIceEvent", 
+"RtcTrackEvent",             
+"MediaStreamTrack",
+"RtcRtpSender",
+"RtcSdpType",
+"RtcIceServer"
 ]
 
 [package.metadata.leptos]

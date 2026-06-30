@@ -24,7 +24,10 @@ pub async fn create_new_group_chat(
 
     
     navigate = navigate.clone();
-    let url = format!("http://localhost:8000/api/m/cg/{}", user_uuid);
+    let _ = dotenvy::dotenv();
+    let base_url = std::env::var("BACKEND_WS_URL")
+    .unwrap_or_else(|_| "http://localhost:8000".to_string()); 
+    let url = format!("{base_url}/api/m/cg/{}", user_uuid);
     let payload = GroupPayload { 
         name : new_group_name,
         conv_id ,
@@ -84,8 +87,9 @@ pub fn MakeGroupChat(conv_id:Uuid, user_uuid: Uuid) -> impl IntoView {
 
     let chats_resource : LocalResource<Option<Vec<ConversationPayloadWithStringKeys>>> = LocalResource::new(move || { 
         let navigate = navigate_resource.clone(); 
-        let url = format!("http://localhost:8000/api/m/conversations/{}", user_uuid); 
-        let ch_url = format!("http://localhost:8000/api/m/ch/{}", user_uuid);
+        let base_url = option_env!("BACKEND_URL").unwrap_or("http://localhost:8000");   
+        let url = format!("{base_url}/api/m/conversations/{}", user_uuid); 
+        let ch_url = format!("{base_url}/api/m/ch/{}", user_uuid);
         
         async move { 
             let res: Result<reqwest::Response, reqwest::Error> = 

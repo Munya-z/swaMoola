@@ -77,8 +77,10 @@ pub fn send_message(
     };
 
     let navigate = navigate.clone();
-    
-    let url = format!("http://localhost:8000/api/m/sm/{}", user_uuid);
+    let _ = dotenvy::dotenv();
+    let base_url = std::env::var("BACKEND_WS_URL")
+    .unwrap_or_else(|_| "http://localhost:8000".to_string());
+    let url = format!("{base_url}/api/m/sm/{}", user_uuid);
 
     leptos::task::spawn_local(async move { 
 

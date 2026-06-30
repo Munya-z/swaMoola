@@ -19,12 +19,17 @@ pub fn login_handler(
         .filter(|c| !c.is_whitespace())
         .collect::<String>();
         let pass_val = password_signal.get();
+
+        let _ = dotenvy::dotenv();
+        let base_url = std::env::var("BACKEND_WS_URL")
+            .unwrap_or_else(|_| "http://localhost:8000".to_string());
+        let api_url = format!("{base_url}/users/login");
         
         
         spawn_local(async move {
             let client = reqwest::Client::new();
             let res : Result<reqwest::Response, reqwest::Error> = client
-                .post("http://localhost:8000/users/login") 
+                .post(api_url) 
                 .json(&LoginCredentials { phone_number: phone_val, password: pass_val })
                 .send()
                 .await;

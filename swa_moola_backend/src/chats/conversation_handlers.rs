@@ -4,6 +4,7 @@ use axum::{extract::{State, Path}, Json, response::IntoResponse, http::StatusCod
 use crate::chats::models::{Conversation,AddParticipantPayload, ConversationParticipant, GroupPayload, ConversationResult, ConversationIdPayload};
 use crate::db::begin_rls_txn;
 use crate::chats::models::UserPublicKeys;
+use crate::AppState;
 
 
 // Create a new conversation and return its details
@@ -115,11 +116,13 @@ pub struct NewChatPayload {
 }
 
 pub async fn create_a_new_conversation(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(user_id): Path<Uuid>, 
     Json(payload): Json<NewChatPayload>, 
 ) -> impl IntoResponse {
     
+
+    let pool =state.db;
     let mut tx = match begin_rls_txn(&pool, user_id).await {
         Ok(tx) => tx,
         Err(e) => {
@@ -165,11 +168,12 @@ pub async fn create_a_new_conversation(
 
 // add a memeber to an existing conversation to make it a group chat
 pub async fn make_a_group_conversation(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(user_id): Path<Uuid>, // Current logged-in user
     Json(payload): Json<GroupPayload>
 ) -> impl IntoResponse {
 
+    let pool = state.db;
     println!("the make group fn is running");
     let mut tx = match begin_rls_txn(&pool, user_id).await {
         Ok(tx) => tx,
@@ -248,12 +252,12 @@ pub async fn make_a_group_conversation(
 }
 
 pub async fn get_conversation_header(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
     Json(payload): Json<ConversationIdPayload>
 ) -> impl IntoResponse {
     println!("get conversation header is running");
-    
+    let pool = state.db;
     let mut tx = match begin_rls_txn(&pool, user_id).await {
         Ok(tx) => tx,
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -353,189 +357,14 @@ pub async fn get_conversation_header(
     }
 }
 
-
-// // get all the details of a conversation including the last message and a dynamic display name based on whether it's a group chat or one-on-one chat
-// pub async fn get_conversation_header(
-//     State(pool): State<PgPool>,
-//     Path(user_id): Path<Uuid>,
-//     Json(payload): Json<ConversationIdPayload>
-// ) -> impl IntoResponse {
-//     println!("get converstion header is running ");
-    
-//     let mut tx = match begin_rls_txn(&pool, user_id).await {
-//         Ok(tx) => tx,
-//         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-//     };
-
-//     // Use query! to easily fetch raw Byte blocks (Vec<u8>)
-//     // let row_result = sqlx::query!(
-//     //     r#"
-//     //         SELECT 
-//     //         c.conv_id as "conv_id!", 
-//     //         c.is_group as "is_group!", 
-//     //         c.created_at as "created_at!",
-//     //         c.last_message_id as "last_message_id?",
-//     //         COALESCE(c.name, 'Untitled') as "name!",
-            
-//     //         COALESCE(CASE 
-//     //             WHEN c.is_group = TRUE THEN COALESCE(c.name, 'Untitled Group')
-//     //             ELSE (
-//     //                 SELECT u.name 
-//     //                 FROM conversation_participants cp_other
-//     //                 JOIN users u ON u.id = cp_other.user_id
-//     //                 WHERE cp_other.conv_id = c.conv_id AND cp_other.user_id != $2
-//     //                 LIMIT 1
-//     //             )
-//     //         END, 'Untitled')::text AS "display_name!",
-
-//     //         (CASE 
-//     //             WHEN c.is_group = FALSE THEN (
-//     //                 SELECT cp_other.user_id 
-//     //                 FROM conversation_participants cp_other
-//     //                 WHERE cp_other.conv_id = c.conv_id AND cp_other.user_id != $2
-//     //                 LIMIT 1
-//     //             )
-//     //             ELSE NULL
-//     //         END) as "recipient_id?",
-
-//     //         (CASE 
-//     //             WHEN c.is_group = FALSE THEN (
-//     //                 SELECT u_other.pq_public 
-//     //                 FROM conversation_participants cp_other
-//     //                 JOIN users u_other ON u_other.id = cp_other.user_id
-//     //                 WHERE cp_other.conv_id = c.conv_id AND cp_other.user_id != $2
-//     //                 LIMIT 1
-//     //             )
-//     //             ELSE NULL
-//     //         END) as "pq_public?", -- Fetches as Option<Vec<u8>>
-
-//     //         (CASE 
-//     //             WHEN c.is_group = FALSE THEN (
-//     //                 SELECT u_other.x_public 
-//     //                 FROM conversation_participants cp_other
-//     //                 JOIN users u_other ON u_other.id = cp_other.user_id
-//     //                 WHERE cp_other.conv_id = c.conv_id AND cp_other.user_id != $2
-//     //                 LIMIT 1
-//     //             )
-//     //             ELSE NULL
-//     //         END) as "x_public?" -- Fetches as Option<Vec<u8>>
-
-//     //     FROM conversations c
-//     //     JOIN conversation_participants cp ON c.conv_id = cp.conv_id
-//     //     WHERE c.conv_id = $1 AND cp.user_id = $2
-//     //     ORDER BY c.created_at DESC;
-//     //     "#,
-//     //     payload.conv_id,
-//     //     user_id
-//     // )
-//     // .fetch_one(&mut *tx)
-//     // .await;
-
-//     let row_result = sqlx::query!(  
-//         r#"
-//         SELECT 
-//             c.conv_id as "conv_id!", 
-//             c.is_group as "is_group!", 
-//             c.created_at as "created_at!",
-//             c.last_message_id as "last_message_id?",
-//             COALESCE(c.name, 'Untitled') as "name!",
-            
-//             COALESCE(CASE 
-//                 WHEN c.is_group = TRUE THEN COALESCE(c.name, 'Untitled Group')
-//                 ELSE (
-//                     SELECT u.name 
-//                     FROM conversation_participants cp_other
-//                     JOIN users u ON u.id = cp_other.user_id
-//                     WHERE cp_other.conv_id = c.conv_id AND cp_other.user_id != $2
-//                     LIMIT 1
-//                 )
-//             END, 'Untitled')::text AS "display_name!",
-
-//             -- Aggregates keys directly into your structure
-//             COALESCE(
-//                 (SELECT jsonb_agg(
-//                     jsonb_build_object(
-//                         -- Keys match your struct fields exactly
-//                         'x25519', encode(u_other.x_public, 'hex'), 
-//                         'mlkem', encode(u_other.pq_public, 'hex')
-//                     )
-//                 )
-//                 FROM conversation_participants cp_other
-//                 JOIN users u_other ON u_other.id = cp_other.user_id
-//                 WHERE cp_other.conv_id = c.conv_id AND cp_other.user_id != $2
-//                 ), 
-//                 '[]'::jsonb
-//             ) as "participant_keys!" -- Fetches as sqlx::types::Json<Vec<UserPublicKeys>>
-
-//         FROM conversations c
-//         JOIN conversation_participants cp ON c.conv_id = cp.conv_id
-//         WHERE c.conv_id = $1 AND cp.user_id = $2
-//         ORDER BY c.created_at DESC;
-//         "#,
-//         payload.conv_id,
-//         user_id
-//     )
-//     .fetch_one(&mut *tx)
-//     .await;
-
-
-//     let row = match row_result {
-//         Ok(r) => r,
-//         Err(e) => return (StatusCode::NOT_FOUND, format!("Conversation not found: {}", e)).into_response(),
-//     };
-
-//     println!("get converstion header is running and got here after database call and got this row :  {:?}", &row);
-
-//     // Parse out keys if this is a 1-on-1 private chat
-//     // let mut recipient_keys = Vec::new();
-   
-//     // if let (Some(x_str), Some(pq_str)) = (row.x_public, row.pq_public) {
-//     //     println!("get converstion header is running and adding string keys");
-//     //     recipient_keys.push(UserPublicKeys { 
-//     //         x25519: x_str, 
-//     //         mlkem: pq_str 
-//     //     });
-//     // }
-
-//     let row: ConversationRow = sqlx::query_as!(...)
-//     .fetch_one(&pool)
-//     .await?;
-
-//     let  recipient_keys: Vec<UserPublicKeys> = row.participant_keys.0; 
-
-//     println!("this is recipient_keys : {:?}", &recipient_keys);
-
-//     println!("get converstion header is running and we attempting thi create a convo");
-
-//     // Map your custom type safely
-//     let convo = ConversationResult {
-//         conv_id: row.conv_id,
-//         is_group: row.is_group,
-//         created_at: row.created_at,
-//         name: row.name,
-//         display_name: Some(row.display_name),
-//         recipient_id: row.recipient_id,
-//         recipient_keys,
-//         last_message_id: row.last_message_id,
-//     };
-
-//     println!("get converstion header is running and convo was created : {:?}", &convo);
-
-//     if let Err(e) = tx.commit().await {
-//         (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
-//     } else {
-//         println!("get converstion header is running and if going to end successfully");
-//         (StatusCode::OK, Json(convo)).into_response()
-//     }
-// }
-
 // axum helper function to add a new participant to an existing conversation to make it a group chat.
 // used to add someone to an existing conversation from the frontend by providing the conversation ID and the new participant's user ID.
 pub async fn add_new_participant_in_conversation(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
     Json(payload): Json<AddParticipantPayload>
 ) -> Result<Json<ConversationParticipant>, StatusCode> {
+    let pool = state.db;
     let mut tx = begin_rls_txn(&pool, user_id).await.map_err(|e|{   
         println!("Failed to start transaction: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR

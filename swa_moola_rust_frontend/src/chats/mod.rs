@@ -8,3 +8,4 @@ pub mod message_encryption;
 pub mod message_decryption;
 pub mod make_new_group_chat;
 pub mod search_user;
+pub mod calls;

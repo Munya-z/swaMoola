@@ -3,6 +3,7 @@ use sqlx::{postgres::{PgPoolOptions, PgPool} };
 use axum::{middleware as axum_middleware};
 use axum::{http::{Method}, Router,routing::get};
 use std::fs;
+use sqlx::Any;
 use tower_http::services::ServeDir;
 use tower_http::cors::{CorsLayer};
 use axum::http::header::{AUTHORIZATION, CONTENT_TYPE, UPGRADE, CONNECTION};
@@ -10,13 +11,15 @@ use axum::{extract::{Path}, http::StatusCode,body::{Body}, routing::post};
 use axum::response::IntoResponse;
 use crate::chats::ws::ws_handler;
 
-
-
 pub mod db; 
 mod users;
 mod chats;
 mod middleware;
 use middleware::auth_middleware;
+pub mod models;
+use models::{AppState, Switchboard};
+use std::sync::Arc;
+use std::sync::RwLock;
 
 
 #[tokio::main]
@@ -38,32 +41,43 @@ async fn main() {
 
     sqlx::migrate!().run(&pool).await.expect("migration failed");
 
-    let public_routes = Router::new()
+    let app_state = AppState {
+        db: pool,
+        switchboard: Arc::new(RwLock::new(Switchboard {
+            connections: std::collections::HashMap::new(),
+        })),
+    };
+
+    let public_routes = Router::<AppState>::new()
         .route("/", get(root))
         .nest("/users", users::routes());
 
-    let protected_routes = Router::new()
+    let protected_routes = Router::<AppState>::new()
         .nest("/uu", users::protected_routes())
         .nest("/m", chats:: routes())  
         .route("/upload/{filename}", post(handle_upload))
         .layer(axum_middleware::from_fn(auth_middleware));
     
     let cors = CorsLayer::new()
-    .allow_origin([
-        "http://localhost:8080".parse().unwrap(),
-        "http://127.0.0.1:8080".parse().unwrap()
-    ])
-    .allow_methods([Method::GET, Method::POST, Method::PUT, Method::PATCH, Method::DELETE])
-    .allow_headers([AUTHORIZATION, CONTENT_TYPE, UPGRADE, CONNECTION])
+    // .allow_origin([
+    //     "https://3ms43rz8-8080.inc1.devtunnels.ms".parse().unwrap(),
+    //     "http://localhost:8080".parse().unwrap(),
+    //     "http://127.0.0.1:8080".parse().unwrap()
+    // ])
+    .allow_origin(Any)
+    // .allow_methods([Method::GET, Method::POST, Method::PUT, Method::PATCH, Method::DELETE])
+    .allow_methods(Any)
+    // .allow_headers([AUTHORIZATION, CONTENT_TYPE, UPGRADE, CONNECTION])
+    .allow_headers(Any)
     .allow_credentials(true);
 
-    let app = Router::new()
+    let app = Router::<AppState>::new()
         .merge(public_routes)
         .nest("/api",protected_routes)
         .route("/api/ws/{id}", get(ws_handler))
         .nest_service("/view-files", ServeDir::new("./local_cloud_storage"))
         .layer(cors)
-        .with_state(pool);
+        .with_state(app_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
     println!("server running on port 8000");

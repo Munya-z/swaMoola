@@ -37,7 +37,10 @@ pub async fn upload_encrypted_file_to_storage(
         .unwrap_or(0);
         
     let filename = format!("vault_file_{}.enc", timestamp);
-    let url = format!("http://localhost:8000/api/upload/{}", filename);
+    let _ = dotenvy::dotenv();
+    let base_url = std::env::var("BACKEND_WS_URL")
+    .unwrap_or_else(|_| "http://localhost:8000".to_string());
+    let url = format!("{base_url}/api/upload/{}", filename);
 
     let response = authenticated_fetch(Method::POST, &url, navigate, Some(encrypted_file_bytes)).await; 
         

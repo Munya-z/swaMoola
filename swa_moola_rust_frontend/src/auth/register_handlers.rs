@@ -22,10 +22,15 @@ pub fn register_handler(
     .collect::<String>();
     let (x_pub, pq_pub) = generate_hybrid_identities();
 
+    let _ = dotenvy::dotenv();
+    let base_url = std::env::var("BACKEND_WS_URL")
+    .unwrap_or_else(|_| "http://localhost:8000".to_string());
+    let api_url = format!("{base_url}/users/register");   
+
     spawn_local(async move {
         let client = reqwest::Client::new();
         let res = client
-            .post("http://localhost:8000/users/register") 
+            .post(api_url) 
             .json(&RegisterCredentials { name: &name_val, phone_number: &phone_val, password: &pass_val , x_public: &x_pub, pq_public: &pq_pub })
             .send()
             .await;

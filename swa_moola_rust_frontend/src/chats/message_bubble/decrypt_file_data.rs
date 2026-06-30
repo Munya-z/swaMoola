@@ -39,7 +39,11 @@ url: String
         url
     };
 
-    let absolute_url = format!("http://localhost:8000{}", clean_url);
+    let _ = dotenvy::dotenv();
+    let base_url = std::env::var("BACKEND_WS_URL")
+    .unwrap_or_else(|_| "http://localhost:8000".to_string()); 
+
+    let absolute_url = format!("{base_url}{}", clean_url);
     let client = reqwest::Client::new();
     let response = client.get(&absolute_url).send().await.ok()?;
     if !response.status().is_success() {

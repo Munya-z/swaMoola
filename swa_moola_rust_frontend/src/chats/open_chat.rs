@@ -39,7 +39,7 @@ pub fn get_chat_messages(
     user_uuid: String,
     current_id_fn: impl Fn() -> String + Send + Sync + 'static, 
     refresh_trigger: Trigger,
-    message_trigger_read: ReadSignal<i32>,
+    // message_trigger_read: ReadSignal<i32>,
 ) -> LocalResource<Option<Vec<SecretInnerPayload>>> {
     LocalResource::new(move || {
         let navigate = navigate.clone();
@@ -47,7 +47,7 @@ pub fn get_chat_messages(
         let current_id_str = current_id_fn();
       
         refresh_trigger.track();
-        message_trigger_read.track();
+        // message_trigger_read.track();
         
         let my_keys = load_private_keys_locally()
             .expect("Critical error: Local cryptographic identity state missing from device memory!");
@@ -58,7 +58,8 @@ pub fn get_chat_messages(
             }
 
             let conv_id = Uuid::parse_str(&current_id_str).unwrap_or_else(|_| Uuid::nil());
-            let url = format!("http://localhost:8000/api/m/{}", user_uuid);
+            let base_url = option_env!("BACKEND_URL").unwrap_or("http://localhost:8000");   
+            let url = format!("{base_url}/api/m/{}", user_uuid);
             let payload = ChatPayload { conv_id }; 
 
             let res = authenticated_fetch(Method::POST, &url, navigate, Some(payload)).await; 
@@ -151,8 +152,10 @@ pub fn get_chat_name(
             let route_id = Uuid::parse_str(&current_id_str).unwrap_or_else(|_| Uuid::nil());
             
             set_resolved_conv_id.set(Some(route_id));
-
-            let url = format!("http://localhost:8000/api/m/ch/{}", user_uuid); 
+            let _ = dotenvy::dotenv();
+            let base_url = std::env::var("BACKEND_WS_URL")
+            .unwrap_or_else(|_| "http://localhost:8000".to_string());  
+            let url = format!("{base_url}/api/m/ch/{}", user_uuid); 
             let payload = ChatPayload { conv_id: route_id }; 
 
             let res = authenticated_fetch(Method::POST, &url, navigate, Some(payload)).await; 
@@ -245,12 +248,15 @@ pub fn OpenChat() -> impl IntoView {
 
     let message_list_ref = NodeRef::<Ul>::new();
     let refresh_trigger = Trigger::new();
-    let (message_trigger_read, message_trigger_write) = signal(0);
+    // let (message_trigger_read, message_trigger_write) = signal(0);
     
-    provide_context(message_trigger_read);
-    provide_context(message_trigger_write);
+    // provide_context(message_trigger_read);
+    // provide_context(message_trigger_write);
     
-    use_websocket_listener(user_uuid.clone());
+    // use_websocket_listener(user_uuid.clone());
+
+    let message_trigger_write = use_context::<WriteSignal<i32>>()
+        .expect("Global message trigger missing from App root scope.");
     
     let navigate_for_name_resource = navigate.clone();
     
@@ -269,7 +275,7 @@ pub fn OpenChat() -> impl IntoView {
         user_uuid.clone(),
         chat_id, 
         refresh_trigger,
-        message_trigger_read,   
+        // message_trigger_read,   
     );
 
    
@@ -285,11 +291,36 @@ pub fn OpenChat() -> impl IntoView {
             let list_ref = message_list_ref;
             
             request_animation_frame(move || {
-                if let Some(el) = list_ref.get_untracked() {
+                if let Some(el) = list_ref.get() {
                     el.set_scroll_top(el.scroll_height());
                 }
             });
             
+        }
+    });
+
+    let call_receiver_id = Memo::new(move |_| {
+        chat_name_resource.get()
+            .flatten() // Flattens Option<Option<T>> to Option<T>
+            .and_then(|chat| chat.recipient_id)
+    });
+
+    let call_url = move || {
+        // 1. Read out the reactive Option<Option<Uuid>> value safely
+        if let Some(uuid) = call_receiver_id.get() {
+            format!("/make_call/{}", uuid)
+            
+        } else {
+            "/make_call/unknown".to_string()
+        }
+    };
+
+
+    Effect::new(move |_| {
+        let current_url = call_url();
+        // Only log once the ID successfully transitions away from unknown status
+        if !current_url.contains("unknown") {
+            log::info!("🎯 Target peer connected! The call_url: {}", current_url);
         }
     });
 
@@ -373,7 +404,7 @@ pub fn OpenChat() -> impl IntoView {
                             "C"
                         </div>
                         <div class="flex flex-col min-w-0">
-                            <Suspense fallback=|| view! { <span class="text-sm text-[#667781] animate-pulse">"Loading..."</span> }>
+                            <Suspense fallback= view! { <span class="text-sm text-[#667781] animate-pulse">"Loading..."</span> }>
                                 {move || {
                                     chat_name_resource.get().map(|data: Option<ConversationPayload>| {
                                         match data {
@@ -396,6 +427,12 @@ pub fn OpenChat() -> impl IntoView {
                                 <path d="M 33.7169 50.6051 C 45.9141 50.6051 56.0000 40.4968 56.0000 28.2994 C 56.0000 16.1245 45.8920 5.9937 33.6944 5.9937 C 22.4180 5.9937 12.9611 14.6419 11.5909 25.5365 C 12.1749 25.5365 12.7365 25.5814 13.2981 25.6712 C 13.9944 25.7611 14.6908 25.9183 15.3646 26.1205 C 16.4204 16.9332 24.1926 9.8124 33.6944 9.8124 C 43.9598 9.8124 52.1812 18.0563 52.2037 28.2994 C 52.2037 33.0840 50.4294 37.3969 47.5090 40.6765 C 44.1171 37.8461 39.0406 35.9593 33.6944 35.9593 C 31.1785 35.9593 28.3258 36.4984 25.6751 37.4418 C 25.8324 38.2954 25.9222 39.1715 25.9222 40.0475 C 25.9222 42.9902 25.0012 45.7531 23.4513 48.0668 C 26.5287 49.6616 30.0329 50.6051 33.7169 50.6051 Z M 33.6944 32.0956 C 38.0073 32.0956 41.2644 28.3668 41.2644 23.6720 C 41.2644 19.2469 37.9399 15.4057 33.6944 15.4057 C 29.4714 15.4057 26.1244 19.2469 26.1244 23.6720 C 26.1244 28.3668 29.4040 32.0956 33.6944 32.0956 Z M 11.4112 51.4587 C 17.6110 51.4587 22.8224 46.2922 22.8224 40.0475 C 22.8224 33.8028 17.6783 28.6363 11.4112 28.6363 C 5.1665 28.6363 0 33.8028 0 40.0475 C 0 46.3372 5.1665 51.4587 11.4112 51.4587 Z M 11.4336 47.4603 C 10.6474 47.4603 9.9511 46.9212 9.9511 46.0676 L 9.9511 41.4178 L 5.6607 41.4178 C 4.8969 41.4178 4.2679 40.7888 4.2679 40.0475 C 4.2679 39.2838 4.8969 38.6548 5.6607 38.6548 L 9.9511 38.6548 L 9.9511 34.0050 C 9.9511 33.1739 10.6474 32.6347 11.4336 32.6347 C 12.1974 32.6347 12.8937 33.1739 12.8937 34.0050 L 12.8937 38.6548 L 17.1841 38.6548 C 17.9479 38.6548 18.5544 39.2838 18.5544 40.0475 C 18.5544 40.7888 17.9479 41.4178 17.1841 41.4178 L 12.8937 41.4178 L 12.8937 46.0676 C 12.8937 46.9212 12.1974 47.4603 11.4336 47.4603 Z"/>
                             </svg>
                         </button>
+
+                        <A href=call_url attr:class="text-sm font-medium text-[#00a884] hover:underline px-3 py-1.5 rounded" >
+                            <svg width="1.5rem" height="1.5rem" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path fill-rule="evenodd" clip-rule="evenodd" d="M17.3545 22.2323C15.3344 21.7262 11.1989 20.2993 7.44976 16.5502C3.70065 12.8011 2.2738 8.66559 1.76767 6.6455C1.47681 5.48459 2.00058 4.36434 2.88869 3.72997L5.21694 2.06693C6.57922 1.09388 8.47432 1.42407 9.42724 2.80051L10.893 4.91776C11.5152 5.8165 11.3006 7.0483 10.4111 7.68365L9.24234 8.51849C9.41923 9.1951 9.96939 10.5846 11.6924 12.3076C13.4154 14.0306 14.8049 14.5807 15.4815 14.7576L16.3163 13.5888C16.9517 12.6994 18.1835 12.4847 19.0822 13.1069L21.1995 14.5727C22.5759 15.5257 22.9061 17.4207 21.933 18.783L20.27 21.1113C19.6356 21.9994 18.5154 22.5232 17.3545 22.2323ZM8.86397 15.136C12.2734 18.5454 16.0358 19.8401 17.8405 20.2923C18.1043 20.3583 18.4232 20.2558 18.6425 19.9488L20.3056 17.6205C20.6299 17.1665 20.5199 16.5348 20.061 16.2171L17.9438 14.7513L17.0479 16.0056C16.6818 16.5182 16.0047 16.9202 15.2163 16.7501C14.2323 16.5378 12.4133 15.8569 10.2782 13.7218C8.1431 11.5867 7.46219 9.7677 7.24987 8.7837C7.07977 7.9953 7.48181 7.31821 7.99439 6.95208L9.24864 6.05618L7.78285 3.93893C7.46521 3.48011 6.83351 3.37005 6.37942 3.6944L4.05117 5.35744C3.74413 5.57675 3.64162 5.89565 3.70771 6.15943C4.15989 7.96418 5.45459 11.7266 8.86397 15.136Z" fill="#0F0F0F"/>
+                            </svg>
+                        </A>
 
                         <A href="/chats" attr:class="text-sm sm:hidden font-medium text-[#00a884] hover:underline px-3 py-1.5 rounded" >
                             <svg fill="#000000" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
